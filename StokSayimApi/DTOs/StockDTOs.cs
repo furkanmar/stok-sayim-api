@@ -18,6 +18,9 @@ public class StockCountDto
 public class AddStockItemDto
 {
     public int StockCountId { get; set; }
-    public string Barcode { get; set; } = string.Empty;
+    /// <summary>Barcode ile ara (eski yol — geriye dönük uyumluluk)</summary>
+    public string? Barcode { get; set; }
+    /// <summary>Doğrudan ProductId ile kaydet (yeni yol)</summary>
+    public int? ProductId { get; set; }
     public double Stock { get; set; }
 }

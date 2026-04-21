@@ -59,13 +59,30 @@ public class StockController : ControllerBase
     [HttpPost("add-item")]
     public async Task<IActionResult> AddItem([FromBody] AddStockItemDto dto)
     {
-        // Barkod artık ProductBarcodes tablosunda
-        var pb = await _db.ProductBarcodes
-            .FirstOrDefaultAsync(x => x.Barcode == dto.Barcode && x.CompanyId == GetCompanyId());
+        int productId;
 
-        if (pb == null) return NotFound(new { message = "Ürün bulunamadı." });
+        if (dto.ProductId.HasValue)
+        {
+            // Yeni yol: doğrudan productId
+            var exists = await _db.Products
+                .AnyAsync(p => p.ProductId == dto.ProductId.Value && p.CompanyId == GetCompanyId());
+            if (!exists) return NotFound(new { message = "Ürün bulunamadı." });
+            productId = dto.ProductId.Value;
+        }
+        else if (!string.IsNullOrWhiteSpace(dto.Barcode))
+        {
+            // Eski yol: barkod üzerinden ara (geriye dönük uyumluluk)
+            var pb = await _db.ProductBarcodes
+                .FirstOrDefaultAsync(x => x.Barcode == dto.Barcode && x.CompanyId == GetCompanyId());
+            if (pb == null) return NotFound(new { message = "Ürün bulunamadı." });
+            productId = pb.ProductId;
+        }
+        else
+        {
+            return BadRequest(new { message = "Barcode veya ProductId gereklidir." });
+        }
 
-        var item = await _stockService.AddOrUpdateItemAsync(dto.StockCountId, pb.ProductId, dto.Stock);
+        var item = await _stockService.AddOrUpdateItemAsync(dto.StockCountId, productId, dto.Stock);
         return Ok(item);
     }
 

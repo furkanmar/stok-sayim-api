@@ -132,9 +132,46 @@ public class SyncService
             barcodesAdded += newBarcodes.Count;
         }
 
+        // ─── Satış fiyatlarını ekle (kasa_fiyati → ADT satisFiyati) ──────────
+        var sqlitePrices = ReadPricesFromSqlite(dbFilePath);
+
+        // Zaten fiyatı olan ürünleri atla (idempotent)
+        var existingPriceProductIds = await _db.ProductPrices
+            .Where(pp => pp.UnitType == "ADT" && allProductIds.Contains(pp.ProductId))
+            .Select(pp => pp.ProductId)
+            .Distinct()
+            .ToHashSetAsync();
+
+        var newPrices = new List<ProductPrice>();
+        foreach (var sp in sqlitePrices)
+        {
+            if (existingPriceProductIds.Contains(sp.ProductId)) continue;
+            if (!allProductIds.Contains(sp.ProductId)) continue;
+
+            newPrices.Add(new ProductPrice
+            {
+                ProductId          = sp.ProductId,
+                UnitType           = "ADT",
+                AlisFiyati         = 0,
+                SatisFiyati        = sp.KasaFiyati,
+                GecerlilikTarihi   = DateTime.UtcNow,
+                OlusturanUserId    = null
+            });
+        }
+
+        int pricesAdded = 0;
+        const int priceBatch = 500;
+        for (int i = 0; i < newPrices.Count; i += priceBatch)
+        {
+            var batch = newPrices.Skip(i).Take(priceBatch).ToList();
+            await _db.ProductPrices.AddRangeAsync(batch);
+            await _db.SaveChangesAsync();
+            pricesAdded += batch.Count;
+        }
+
         _logger.LogInformation(
-            "Sync complete — products added: {PA}, barcodes added: {BA}, barcodes skipped: {BS}",
-            productsAdded, barcodesAdded, barcodesSkipped);
+            "Sync complete — products added: {PA}, barcodes added: {BA}, barcodes skipped: {BS}, prices added: {PrA}",
+            productsAdded, barcodesAdded, barcodesSkipped, pricesAdded);
 
         // ─── Sync kaydı oluştur ───────────────────────────────────────────────
         var log = new SecMarketSyncLog
@@ -257,6 +294,42 @@ public class SyncService
         return results;
     }
 
+    // ─── SQLite okuma: Satış fiyatları (kasa_fiyati) ─────────────────────────
+
+    private List<SqlitePrice> ReadPricesFromSqlite(string dbPath)
+    {
+        var results = new List<SqlitePrice>();
+
+        using var conn = new SqliteConnection($"Data Source={dbPath};Mode=ReadOnly");
+        conn.Open();
+
+        // Her ürün için source_barcode → csv_products.kasa_fiyati eşleşmesi
+        var sql = @"
+            SELECT
+                bl.product_id,
+                MAX(cp.kasa_fiyati) AS kasa_fiyati
+            FROM barcode_lookup bl
+            INNER JOIN csv_products cp ON cp.barcode = bl.source_barcode
+            WHERE bl.status = 'found'
+              AND cp.kasa_fiyati IS NOT NULL
+              AND cp.kasa_fiyati > 0
+            GROUP BY bl.product_id";
+
+        using var cmd = new SqliteCommand(sql, conn);
+        using var reader = cmd.ExecuteReader();
+
+        while (reader.Read())
+        {
+            results.Add(new SqlitePrice
+            {
+                ProductId  = reader.GetInt32(0),
+                KasaFiyati = reader.GetDouble(1)
+            });
+        }
+
+        return results;
+    }
+
     // ─── Yardımcı iç sınıflar ─────────────────────────────────────────────────
 
     private class SqliteProduct
@@ -277,5 +350,11 @@ public class SyncService
         public string Barcode { get; set; } = string.Empty;
         public string UnitType { get; set; } = "ADT";
         public double? UnitQuantity { get; set; }
+    }
+
+    private class SqlitePrice
+    {
+        public int ProductId { get; set; }
+        public double KasaFiyati { get; set; }
     }
 }

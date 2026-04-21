@@ -256,6 +256,79 @@ public class ProductService
             dto.ProductId, dto.Prices.Count);
     }
 
+    // ─── Ürün listesi (sayfalı, filtrelenebilir) ──────────────────────────────
+
+    public async Task<ProductListResultDto> GetProductListAsync(
+        string? q, string? marka, string? kategori, int page, int pageSize, int companyId)
+    {
+        var query = _db.Products.Where(p => p.CompanyId == companyId);
+
+        if (!string.IsNullOrWhiteSpace(q))
+            query = query.Where(p => p.ProductName.ToLower().Contains(q.ToLower()));
+        if (!string.IsNullOrWhiteSpace(marka))
+            query = query.Where(p => p.Marka == marka);
+        if (!string.IsNullOrWhiteSpace(kategori))
+            query = query.Where(p => p.Kategori == kategori);
+
+        var total = await query.CountAsync();
+        var offset = (page - 1) * pageSize;
+
+        var products = await query
+            .OrderBy(p => p.ProductName)
+            .Skip(offset)
+            .Take(pageSize)
+            .Select(p => new
+            {
+                p.ProductId, p.ProductName, p.Marka, p.Kategori, p.AltKategori, p.Unit, p.KdvOrani,
+                BarcodeCount = p.Barcodes.Count()
+            })
+            .ToListAsync();
+
+        var productIds = products.Select(p => p.ProductId).ToList();
+
+        // ADT fiyatlarını tek sorguda çek — sonra client-side en güncel olanı al
+        var allAdtPrices = await _db.ProductPrices
+            .Where(pp => productIds.Contains(pp.ProductId) && pp.UnitType == "ADT")
+            .OrderByDescending(pp => pp.GecerlilikTarihi)
+            .ToListAsync();
+
+        var latestPrices = allAdtPrices
+            .GroupBy(pp => pp.ProductId)
+            .ToDictionary(g => g.Key, g => (double?)g.First().SatisFiyati);
+
+        var items = products.Select(p => new ProductListItemDto
+        {
+            ProductId    = p.ProductId,
+            ProductName  = p.ProductName,
+            Marka        = p.Marka,
+            Kategori     = p.Kategori,
+            AltKategori  = p.AltKategori,
+            Unit         = p.Unit,
+            KdvOrani     = p.KdvOrani,
+            BarcodeCount = p.BarcodeCount,
+            SatisFiyati  = latestPrices.GetValueOrDefault(p.ProductId)
+        }).ToList();
+
+        return new ProductListResultDto
+        {
+            Items   = items,
+            Total   = total,
+            HasMore = offset + items.Count < total
+        };
+    }
+
+    // ─── Kategori listesi ─────────────────────────────────────────────────────
+
+    public async Task<List<string>> GetKategorilerAsync(int companyId)
+    {
+        return await _db.Products
+            .Where(p => p.CompanyId == companyId && p.Kategori != null && p.Kategori != "")
+            .Select(p => p.Kategori!)
+            .Distinct()
+            .OrderBy(k => k)
+            .ToListAsync();
+    }
+
     // ─── Fiyat geçmişi ────────────────────────────────────────────────────────
 
     public async Task<List<ProductPrice>> GetPriceHistoryAsync(int productId)

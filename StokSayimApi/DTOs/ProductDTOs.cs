@@ -78,6 +78,29 @@ public class ProductPriceDto
     public DateTime GecerlilikTarihi { get; set; }
 }
 
+/// <summary>Ürün listesi tek satır</summary>
+public class ProductListItemDto
+{
+    public int ProductId { get; set; }
+    public string ProductName { get; set; } = string.Empty;
+    public string? Marka { get; set; }
+    public string? Kategori { get; set; }
+    public string? AltKategori { get; set; }
+    public string Unit { get; set; } = string.Empty;
+    public int KdvOrani { get; set; }
+    public int BarcodeCount { get; set; }
+    /// <summary>En güncel ADT satış fiyatı (varsa)</summary>
+    public double? SatisFiyati { get; set; }
+}
+
+/// <summary>Sayfalı ürün listesi cevabı</summary>
+public class ProductListResultDto
+{
+    public List<ProductListItemDto> Items { get; set; } = new();
+    public int Total { get; set; }
+    public bool HasMore { get; set; }
+}
+
 /// <summary>Sync sonuç özeti</summary>
 public class SyncResultDto
 {

@@ -125,6 +125,30 @@ public class ProductController : ControllerBase
         catch (KeyNotFoundException ex) { return NotFound(new { error = ex.Message }); }
     }
 
+    // ─── Ürün listesi (sayfalı) ───────────────────────────────────────────────
+
+    [HttpGet("list")]
+    public async Task<IActionResult> GetList(
+        [FromQuery] string? q,
+        [FromQuery] string? marka,
+        [FromQuery] string? kategori,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 30)
+    {
+        if (pageSize > 100) pageSize = 100;
+        var result = await _productService.GetProductListAsync(q, marka, kategori, page, pageSize, GetCompanyId());
+        return Ok(result);
+    }
+
+    // ─── Kategori listesi ─────────────────────────────────────────────────────
+
+    [HttpGet("kategoriler")]
+    public async Task<IActionResult> GetKategoriler()
+    {
+        var kategoriler = await _productService.GetKategorilerAsync(GetCompanyId());
+        return Ok(kategoriler);
+    }
+
     // ─── Fiyat geçmişi ────────────────────────────────────────────────────────
 
     [HttpGet("{id:int}/prices")]
