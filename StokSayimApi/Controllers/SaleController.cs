@@ -59,6 +59,21 @@ public class SaleController : ControllerBase
         return Ok(sales.Select(MapToResponse));
     }
 
+    // POST /api/sales/return — barkod taramalı iade modu (tüm roller)
+    [HttpPost("return")]
+    public async Task<IActionResult> CreateReturn([FromBody] CreateReturnDto dto)
+    {
+        try
+        {
+            var sale = await _saleService.CreateReturnAsync(dto, GetUserId(), GetCompanyId());
+            return Ok(MapToResponse(sale));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     // POST /api/sales/{id}/refund — iade
     [HttpPost("{id:int}/refund")]
     public async Task<IActionResult> Refund(int id, [FromBody] RefundSaleDto dto)
@@ -94,6 +109,7 @@ public class SaleController : ControllerBase
         DiscountAmount = sale.DiscountAmount,
         GrandTotal = sale.GrandTotal,
         IsRefunded = sale.IsRefunded,
+        IsReturn = sale.IsReturn,
         Items = sale.Items.Select(i => new SaleItemResponseDto
         {
             Id = i.Id,

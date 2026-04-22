@@ -96,7 +96,53 @@ public class SaleService
             .ToListAsync();
     }
 
-    // ─── İade ────────────────────────────────────────────────────────────────
+    // ─── İade Modu (barkod taramalı geri alım) ──────────────────────────────
+
+    public async Task<Sale> CreateReturnAsync(CreateReturnDto dto, int userId, int companyId)
+    {
+        if (dto.Items.Count == 0)
+            throw new InvalidOperationException("İade listesi boş olamaz.");
+
+        var receiptNo = "I" + DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString().Substring(5);
+
+        var sale = new Sale
+        {
+            ReceiptNo = receiptNo,
+            BranchId = dto.BranchId,
+            UserId = userId,
+            CompanyId = companyId,
+            TotalAmount = dto.TotalAmount,
+            DiscountAmount = 0,
+            GrandTotal = dto.GrandTotal,
+            IsReturn = true,
+            CreatedAt = DateTime.UtcNow,
+            Items = dto.Items.Select(i => new SaleItem
+            {
+                ProductId = i.ProductId,
+                ProductName = i.ProductName,
+                Barcode = i.Barcode,
+                UnitType = i.UnitType,
+                Quantity = i.Quantity,
+                SatisFiyati = i.SatisFiyati,
+                KdvOrani = i.KdvOrani,
+                LineTotal = i.LineTotal,
+            }).ToList(),
+            Payments = new List<SalePayment>
+            {
+                new SalePayment { PaymentType = "cash", Amount = dto.GrandTotal },
+            },
+        };
+
+        _db.Sales.Add(sale);
+        await _db.SaveChangesAsync();
+
+        _logger.LogInformation("Return created: {ReceiptNo}, branch: {BranchId}, total: {GrandTotal}",
+            receiptNo, dto.BranchId, dto.GrandTotal);
+
+        return await LoadSaleWithDetailsAsync(sale.Id);
+    }
+
+    // ─── İade (eski satış üzerinden işaretleme) ──────────────────────────────
 
     public async Task<Sale> RefundAsync(RefundSaleDto dto, int companyId)
     {

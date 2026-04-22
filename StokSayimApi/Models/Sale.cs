@@ -11,6 +11,7 @@ public class Sale
     public decimal DiscountAmount { get; set; }              // İskonto tutarı
     public decimal GrandTotal { get; set; }                  // Ödenen tutar
     public bool IsRefunded { get; set; } = false;
+    public bool IsReturn { get; set; } = false;           // true → iade/geri alım fişi
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public Branch Branch { get; set; } = null!;

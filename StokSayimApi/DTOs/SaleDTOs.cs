@@ -30,6 +30,26 @@ public class CreateSaleDto
     public decimal GrandTotal { get; set; }
 }
 
+public class CreateReturnItemDto
+{
+    public int ProductId { get; set; }
+    public string ProductName { get; set; } = string.Empty;
+    public string Barcode { get; set; } = string.Empty;
+    public string UnitType { get; set; } = "ADT";
+    public decimal Quantity { get; set; }
+    public decimal SatisFiyati { get; set; }
+    public int KdvOrani { get; set; }
+    public decimal LineTotal { get; set; }
+}
+
+public class CreateReturnDto
+{
+    public int BranchId { get; set; }
+    public List<CreateReturnItemDto> Items { get; set; } = new();
+    public decimal TotalAmount { get; set; }
+    public decimal GrandTotal { get; set; }
+}
+
 public class RefundItemDto
 {
     public int SaleItemId { get; set; }
@@ -77,6 +97,7 @@ public class SaleResponseDto
     public decimal DiscountAmount { get; set; }
     public decimal GrandTotal { get; set; }
     public bool IsRefunded { get; set; }
+    public bool IsReturn { get; set; }
     public List<SaleItemResponseDto> Items { get; set; } = new();
     public List<SalePaymentResponseDto> Payments { get; set; } = new();
 }
