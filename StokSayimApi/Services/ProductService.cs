@@ -228,6 +228,27 @@ public class ProductService
         return pb;
     }
 
+    // ─── Barkod sil ───────────────────────────────────────────────────────────
+
+    public async Task DeleteBarcodeAsync(int productId, string barcode, int companyId)
+    {
+        var pb = await _db.ProductBarcodes
+            .FirstOrDefaultAsync(x =>
+                x.Barcode    == barcode    &&
+                x.ProductId  == productId  &&
+                x.CompanyId  == companyId);
+
+        if (pb == null)
+            throw new KeyNotFoundException(
+                $"Barkod '{barcode}' bu ürüne ({productId}) ait değil veya bulunamadı.");
+
+        _db.ProductBarcodes.Remove(pb);
+        await _db.SaveChangesAsync();
+        _logger.LogInformation(
+            "Barcode deleted: {Barcode} (UnitType={UnitType}) ← ProductId={ProductId}",
+            barcode, pb.UnitType, productId);
+    }
+
     // ─── Fiyat kaydet (toplu, tüm unit_type'lar için) ─────────────────────────
 
     public async Task SavePricesAsync(SavePricesDto dto, int userId, int companyId)

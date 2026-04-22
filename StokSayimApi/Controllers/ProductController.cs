@@ -112,6 +112,19 @@ public class ProductController : ControllerBase
         catch (InvalidOperationException ex) { return Conflict(new { error = ex.Message }); }
     }
 
+    // ─── Barkod sil ──────────────────────────────────────────────────────────
+
+    [HttpDelete("{id:int}/barcodes/{barcode}")]
+    public async Task<IActionResult> DeleteBarcode(int id, string barcode)
+    {
+        try
+        {
+            await _productService.DeleteBarcodeAsync(id, barcode, GetCompanyId());
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex) { return NotFound(new { error = ex.Message }); }
+    }
+
     // ─── Toplu fiyat kaydet ───────────────────────────────────────────────────
 
     [HttpPost("prices")]
