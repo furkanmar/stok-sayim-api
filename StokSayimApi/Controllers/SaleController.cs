@@ -47,9 +47,8 @@ public class SaleController : ControllerBase
         return Ok(MapToResponse(sale));
     }
 
-    // GET /api/sales/daily/{branchId}?date=2026-04-22 — günlük satışlar
+    // GET /api/sales/daily/{branchId}?date=2026-04-22 — günlük satışlar (tüm roller)
     [HttpGet("daily/{branchId:int}")]
-    [Authorize(Roles = "admin,superadmin")]
     public async Task<IActionResult> GetDaily(int branchId, [FromQuery] string? date = null)
     {
         DateOnly? parsedDate = null;
