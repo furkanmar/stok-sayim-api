@@ -19,6 +19,21 @@ try
 
     builder.Host.UseSerilog();
 
+    builder.Services.AddCors(options =>
+    {
+        options.AddPolicy("PosApp", policy =>
+        {
+            policy
+                .WithOrigins(
+                    "http://localhost:5173",    // Vite dev
+                    "http://localhost:4173",    // Vite preview
+                    "https://kasa.marifoglu.trade" // prod (domain netleşince güncelle)
+                )
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+        });
+    });
+
     builder.Services.AddControllers().AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
@@ -62,6 +77,7 @@ try
     builder.Services.AddScoped<ReportService>();
     builder.Services.AddScoped<CategoryService>();
     builder.Services.AddScoped<SyncService>();
+    builder.Services.AddScoped<SaleService>();
 
     var app = builder.Build();
 
@@ -71,6 +87,7 @@ try
         app.UseSwaggerUI();
     }
 
+    app.UseCors("PosApp");
     app.UseAuthentication();
     app.UseAuthorization();
     app.MapControllers();

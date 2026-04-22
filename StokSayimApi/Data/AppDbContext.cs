@@ -19,6 +19,9 @@ public class AppDbContext : DbContext
     public DbSet<ProductPrice> ProductPrices => Set<ProductPrice>();
     public DbSet<ProductBarcode> ProductBarcodes => Set<ProductBarcode>();
     public DbSet<SecMarketSyncLog> SecMarketSyncLogs => Set<SecMarketSyncLog>();
+    public DbSet<Sale> Sales => Set<Sale>();
+    public DbSet<SaleItem> SaleItems => Set<SaleItem>();
+    public DbSet<SalePayment> SalePayments => Set<SalePayment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -55,5 +58,49 @@ public class AppDbContext : DbContext
         // ProductPrice: index for fetching prices of a product by unit_type
         modelBuilder.Entity<ProductPrice>()
             .HasIndex(pp => new { pp.ProductId, pp.UnitType });
+
+        // Sale: unique receipt number
+        modelBuilder.Entity<Sale>()
+            .HasIndex(s => s.ReceiptNo)
+            .IsUnique();
+
+        // Sale: index for daily queries (branchId + date)
+        modelBuilder.Entity<Sale>()
+            .HasIndex(s => new { s.BranchId, s.CreatedAt });
+
+        // Sale: index for company-level queries
+        modelBuilder.Entity<Sale>()
+            .HasIndex(s => s.CompanyId);
+
+        // SaleItem: decimal precision
+        modelBuilder.Entity<SaleItem>()
+            .Property(i => i.SatisFiyati)
+            .HasPrecision(18, 4);
+
+        modelBuilder.Entity<SaleItem>()
+            .Property(i => i.LineTotal)
+            .HasPrecision(18, 4);
+
+        modelBuilder.Entity<SaleItem>()
+            .Property(i => i.Quantity)
+            .HasPrecision(18, 4);
+
+        // Sale: decimal precision
+        modelBuilder.Entity<Sale>()
+            .Property(s => s.TotalAmount)
+            .HasPrecision(18, 4);
+
+        modelBuilder.Entity<Sale>()
+            .Property(s => s.DiscountAmount)
+            .HasPrecision(18, 4);
+
+        modelBuilder.Entity<Sale>()
+            .Property(s => s.GrandTotal)
+            .HasPrecision(18, 4);
+
+        // SalePayment: decimal precision
+        modelBuilder.Entity<SalePayment>()
+            .Property(p => p.Amount)
+            .HasPrecision(18, 4);
     }
 }

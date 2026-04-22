@@ -229,6 +229,73 @@ namespace StokSayimApi.Migrations
                 b.HasOne("StokSayimApi.Models.Branch", "Branch")
                     .WithMany().HasForeignKey("BranchId").OnDelete(DeleteBehavior.Cascade).IsRequired();
             });
+
+            modelBuilder.Entity("StokSayimApi.Models.Sale", b =>
+            {
+                b.Property<int>("Id").ValueGeneratedOnAdd().HasColumnType("integer");
+                NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                b.Property<string>("ReceiptNo").IsRequired().HasColumnType("text");
+                b.Property<int>("BranchId").HasColumnType("integer");
+                b.Property<int>("UserId").HasColumnType("integer");
+                b.Property<int>("CompanyId").HasColumnType("integer");
+                b.Property<decimal>("TotalAmount").HasColumnType("numeric(18,4)");
+                b.Property<decimal>("DiscountAmount").HasColumnType("numeric(18,4)");
+                b.Property<decimal>("GrandTotal").HasColumnType("numeric(18,4)");
+                b.Property<bool>("IsRefunded").HasColumnType("boolean");
+                b.Property<DateTime>("CreatedAt").HasColumnType("timestamp with time zone");
+                b.HasKey("Id");
+                b.HasIndex("ReceiptNo").IsUnique();
+                b.HasIndex("BranchId", "CreatedAt");
+                b.HasIndex("CompanyId");
+                b.ToTable("Sales");
+            });
+
+            modelBuilder.Entity("StokSayimApi.Models.SaleItem", b =>
+            {
+                b.Property<int>("Id").ValueGeneratedOnAdd().HasColumnType("integer");
+                NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                b.Property<int>("SaleId").HasColumnType("integer");
+                b.Property<int>("ProductId").HasColumnType("integer");
+                b.Property<string>("ProductName").IsRequired().HasColumnType("text");
+                b.Property<string>("Barcode").IsRequired().HasColumnType("text");
+                b.Property<string>("UnitType").IsRequired().HasColumnType("text");
+                b.Property<decimal>("Quantity").HasColumnType("numeric(18,4)");
+                b.Property<decimal>("SatisFiyati").HasColumnType("numeric(18,4)");
+                b.Property<int>("KdvOrani").HasColumnType("integer");
+                b.Property<decimal>("LineTotal").HasColumnType("numeric(18,4)");
+                b.HasKey("Id");
+                b.HasIndex("SaleId");
+                b.ToTable("SaleItems");
+            });
+
+            modelBuilder.Entity("StokSayimApi.Models.SalePayment", b =>
+            {
+                b.Property<int>("Id").ValueGeneratedOnAdd().HasColumnType("integer");
+                NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                b.Property<int>("SaleId").HasColumnType("integer");
+                b.Property<string>("PaymentType").IsRequired().HasColumnType("text");
+                b.Property<decimal>("Amount").HasColumnType("numeric(18,4)");
+                b.HasKey("Id");
+                b.HasIndex("SaleId");
+                b.ToTable("SalePayments");
+            });
+
+            modelBuilder.Entity("StokSayimApi.Models.Sale", b =>
+            {
+                b.HasOne("StokSayimApi.Models.Branch", "Branch")
+                    .WithMany().HasForeignKey("BranchId").OnDelete(DeleteBehavior.Restrict).IsRequired();
+                b.HasOne("StokSayimApi.Models.User", "User")
+                    .WithMany().HasForeignKey("UserId").OnDelete(DeleteBehavior.Restrict).IsRequired();
+            });
+
+            modelBuilder.Entity("StokSayimApi.Models.SaleItem", b =>
+                b.HasOne("StokSayimApi.Models.Sale", "Sale")
+                    .WithMany("Items").HasForeignKey("SaleId").OnDelete(DeleteBehavior.Cascade).IsRequired());
+
+            modelBuilder.Entity("StokSayimApi.Models.SalePayment", b =>
+                b.HasOne("StokSayimApi.Models.Sale", "Sale")
+                    .WithMany("Payments").HasForeignKey("SaleId").OnDelete(DeleteBehavior.Cascade).IsRequired());
+
 #pragma warning restore 612, 618
         }
     }
