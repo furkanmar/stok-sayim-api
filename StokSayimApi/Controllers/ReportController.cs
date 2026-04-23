@@ -44,4 +44,63 @@ public class ReportController : ControllerBase
         if (report == null) return NotFound(new { message = "Şube bulunamadı." });
         return Ok(report);
     }
+
+    // GET /api/reports/analytics/trend?branchId=1&startDate=2026-04-01&endDate=2026-04-30
+    [HttpGet("analytics/trend")]
+    public async Task<IActionResult> GetSalesTrend(
+        [FromQuery] int branchId,
+        [FromQuery] string? startDate = null,
+        [FromQuery] string? endDate = null)
+    {
+        var end = DateOnly.FromDateTime(DateTime.UtcNow);
+        var start = end.AddDays(-29); // varsayılan: son 30 gün
+
+        if (!string.IsNullOrWhiteSpace(startDate) && DateOnly.TryParse(startDate, out var s))
+            start = s;
+        if (!string.IsNullOrWhiteSpace(endDate) && DateOnly.TryParse(endDate, out var e))
+            end = e;
+
+        var data = await _saleService.GetSalesTrendAsync(branchId, GetCompanyId(), start, end);
+        return Ok(data);
+    }
+
+    // GET /api/reports/analytics/bestsellers?branchId=1&startDate=&endDate=&limit=10
+    [HttpGet("analytics/bestsellers")]
+    public async Task<IActionResult> GetBestsellers(
+        [FromQuery] int branchId,
+        [FromQuery] string? startDate = null,
+        [FromQuery] string? endDate = null,
+        [FromQuery] int limit = 10)
+    {
+        var end = DateOnly.FromDateTime(DateTime.UtcNow);
+        var start = end.AddDays(-29);
+
+        if (!string.IsNullOrWhiteSpace(startDate) && DateOnly.TryParse(startDate, out var s))
+            start = s;
+        if (!string.IsNullOrWhiteSpace(endDate) && DateOnly.TryParse(endDate, out var e))
+            end = e;
+
+        limit = Math.Clamp(limit, 1, 50);
+        var data = await _saleService.GetBestsellersAsync(branchId, GetCompanyId(), start, end, limit);
+        return Ok(data);
+    }
+
+    // GET /api/reports/analytics/categories?branchId=1&startDate=&endDate=
+    [HttpGet("analytics/categories")]
+    public async Task<IActionResult> GetCategorySales(
+        [FromQuery] int branchId,
+        [FromQuery] string? startDate = null,
+        [FromQuery] string? endDate = null)
+    {
+        var end = DateOnly.FromDateTime(DateTime.UtcNow);
+        var start = end.AddDays(-29);
+
+        if (!string.IsNullOrWhiteSpace(startDate) && DateOnly.TryParse(startDate, out var s))
+            start = s;
+        if (!string.IsNullOrWhiteSpace(endDate) && DateOnly.TryParse(endDate, out var e))
+            end = e;
+
+        var data = await _saleService.GetCategorySalesAsync(branchId, GetCompanyId(), start, end);
+        return Ok(data);
+    }
 }

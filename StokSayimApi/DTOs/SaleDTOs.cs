@@ -102,6 +102,34 @@ public class SaleResponseDto
     public List<SalePaymentResponseDto> Payments { get; set; } = new();
 }
 
+// ─── Analitik ─────────────────────────────────────────────────────────────────
+
+public class SalesTrendItemDto
+{
+    public string Date { get; set; } = string.Empty;   // "yyyy-MM-dd"
+    public int SaleCount { get; set; }
+    public decimal GrandTotal { get; set; }
+    public decimal CashTotal { get; set; }
+    public decimal CardTotal { get; set; }
+}
+
+public class BestsellerItemDto
+{
+    public int ProductId { get; set; }
+    public string ProductName { get; set; } = string.Empty;
+    public string Marka { get; set; } = string.Empty;
+    public string Kategori { get; set; } = string.Empty;
+    public decimal TotalQuantity { get; set; }
+    public decimal TotalRevenue { get; set; }
+}
+
+public class CategorySalesItemDto
+{
+    public string Kategori { get; set; } = string.Empty;
+    public decimal TotalRevenue { get; set; }
+    public decimal Percentage { get; set; }
+}
+
 // ─── Z Raporu ────────────────────────────────────────────────────────────────
 
 public class KdvLineDto

@@ -21,11 +21,26 @@ public class BranchController : ControllerBase
     }
 
     private int GetCompanyId() => int.Parse(User.FindFirstValue("companyId")!);
+    private int GetUserId() => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    private string GetRole() => User.FindFirstValue(ClaimTypes.Role) ?? "user";
 
     [HttpGet]
     public async Task<IActionResult> GetBranches()
     {
-        var branches = await _branchService.GetBranchesByCompanyAsync(GetCompanyId());
+        var role = GetRole();
+        List<Models.Branch> branches;
+
+        // user (kasiyer) rolü: sadece kendine atanmış şubeler
+        if (role == "user")
+        {
+            branches = await _branchService.GetBranchesByUserAsync(GetUserId(), GetCompanyId());
+        }
+        else
+        {
+            // admin / superadmin: şirketin tüm şubeleri
+            branches = await _branchService.GetBranchesByCompanyAsync(GetCompanyId());
+        }
+
         return Ok(branches.Select(b => new BranchDto { Id = b.Id, Name = b.Name }));
     }
 

@@ -198,12 +198,17 @@ public class SaleService
                      && s.CreatedAt < endUtc)
             .ToListAsync();
 
-        var activeSales = sales.Where(s => !s.IsRefunded).ToList();
-        var refundedSales = sales.Where(s => s.IsRefunded).ToList();
+        // Aktif satışlar: iade edilmemiş VE geri alım fişi olmayan
+        var activeSales = sales.Where(s => !s.IsRefunded && !s.IsReturn).ToList();
+        // İade edilmiş satışlar (refund işaretli)
+        var refundedSales = sales.Where(s => s.IsRefunded && !s.IsReturn).ToList();
+        // Barkod taramalı geri alım fişleri (IsReturn = true)
+        var returnSales = sales.Where(s => s.IsReturn).ToList();
 
         var grandTotal = activeSales.Sum(s => s.GrandTotal);
         var discountTotal = activeSales.Sum(s => s.DiscountAmount);
-        var refundTotal = refundedSales.Sum(s => s.GrandTotal);
+        // Hem refund hem de geri alım fişlerinin toplamı
+        var refundTotal = refundedSales.Sum(s => s.GrandTotal) + returnSales.Sum(s => s.GrandTotal);
 
         var cashTotal = activeSales
             .SelectMany(s => s.Payments)
@@ -215,7 +220,7 @@ public class SaleService
             .Where(p => p.PaymentType == "card")
             .Sum(p => p.Amount);
 
-        // KDV dökümü — her farklı oran için ayrı satır
+        // KDV dökümü — sadece aktif satışlar (geri alım ve refund hariç)
         var kdvLines = activeSales
             .SelectMany(s => s.Items)
             .GroupBy(i => i.KdvOrani)
@@ -250,6 +255,146 @@ public class SaleService
             NetRevenue = Math.Round(grandTotal - refundTotal, 2),
             KdvLines = kdvLines,
         };
+    }
+
+    // ─── Satış Trendi ────────────────────────────────────────────────────────────
+
+    public async Task<List<SalesTrendItemDto>> GetSalesTrendAsync(
+        int branchId, int companyId, DateOnly startDate, DateOnly endDate)
+    {
+        var startUtc = startDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var endUtc = endDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddDays(1);
+
+        var sales = await _db.Sales
+            .Include(s => s.Payments)
+            .Where(s => s.BranchId == branchId
+                     && s.CompanyId == companyId
+                     && s.CreatedAt >= startUtc
+                     && s.CreatedAt < endUtc
+                     && !s.IsRefunded
+                     && !s.IsReturn)
+            .ToListAsync();
+
+        var grouped = sales
+            .GroupBy(s => DateOnly.FromDateTime(s.CreatedAt))
+            .ToDictionary(
+                g => g.Key,
+                g => new SalesTrendItemDto
+                {
+                    Date = g.Key.ToString("yyyy-MM-dd"),
+                    SaleCount = g.Count(),
+                    GrandTotal = Math.Round(g.Sum(s => s.GrandTotal), 2),
+                    CashTotal = Math.Round(g.SelectMany(s => s.Payments)
+                        .Where(p => p.PaymentType == "cash").Sum(p => p.Amount), 2),
+                    CardTotal = Math.Round(g.SelectMany(s => s.Payments)
+                        .Where(p => p.PaymentType == "card").Sum(p => p.Amount), 2),
+                });
+
+        // Aralıktaki tüm günleri doldur (satışsız günler sıfır)
+        var result = new List<SalesTrendItemDto>();
+        for (var d = startDate; d <= endDate; d = d.AddDays(1))
+        {
+            result.Add(grouped.TryGetValue(d, out var item) ? item : new SalesTrendItemDto
+            {
+                Date = d.ToString("yyyy-MM-dd"),
+                SaleCount = 0,
+                GrandTotal = 0,
+                CashTotal = 0,
+                CardTotal = 0,
+            });
+        }
+
+        return result;
+    }
+
+    // ─── En Çok Satılanlar ───────────────────────────────────────────────────────
+
+    public async Task<List<BestsellerItemDto>> GetBestsellersAsync(
+        int branchId, int companyId, DateOnly startDate, DateOnly endDate, int limit = 10)
+    {
+        var startUtc = startDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var endUtc = endDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddDays(1);
+
+        var items = await _db.SaleItems
+            .Where(i => i.Sale.BranchId == branchId
+                     && i.Sale.CompanyId == companyId
+                     && i.Sale.CreatedAt >= startUtc
+                     && i.Sale.CreatedAt < endUtc
+                     && !i.Sale.IsRefunded
+                     && !i.Sale.IsReturn)
+            .GroupBy(i => new { i.ProductId, i.ProductName })
+            .Select(g => new BestsellerItemDto
+            {
+                ProductId = g.Key.ProductId,
+                ProductName = g.Key.ProductName,
+                Marka = string.Empty,
+                Kategori = string.Empty,
+                TotalQuantity = g.Sum(i => i.Quantity),
+                TotalRevenue = Math.Round(g.Sum(i => i.LineTotal), 2),
+            })
+            .OrderByDescending(x => x.TotalRevenue)
+            .Take(limit)
+            .ToListAsync();
+
+        var productIds = items.Select(i => i.ProductId).ToList();
+        var products = await _db.Products
+            .Where(p => productIds.Contains(p.ProductId) && p.CompanyId == companyId)
+            .Select(p => new { p.ProductId, p.Marka, p.Kategori })
+            .ToListAsync();
+
+        foreach (var item in items)
+        {
+            var prod = products.FirstOrDefault(p => p.ProductId == item.ProductId);
+            if (prod != null)
+            {
+                item.Marka = prod.Marka ?? string.Empty;
+                item.Kategori = prod.Kategori ?? string.Empty;
+            }
+        }
+
+        return items;
+    }
+
+    // ─── Kategori Bazlı Satış Dağılımı ──────────────────────────────────────────
+
+    public async Task<List<CategorySalesItemDto>> GetCategorySalesAsync(
+        int branchId, int companyId, DateOnly startDate, DateOnly endDate)
+    {
+        var startUtc = startDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var endUtc = endDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddDays(1);
+
+        var saleItems = await _db.SaleItems
+            .Where(i => i.Sale.BranchId == branchId
+                     && i.Sale.CompanyId == companyId
+                     && i.Sale.CreatedAt >= startUtc
+                     && i.Sale.CreatedAt < endUtc
+                     && !i.Sale.IsRefunded
+                     && !i.Sale.IsReturn)
+            .Select(i => new { i.ProductId, i.LineTotal })
+            .ToListAsync();
+
+        var productIds = saleItems.Select(i => i.ProductId).Distinct().ToList();
+        var productCategories = await _db.Products
+            .Where(p => productIds.Contains(p.ProductId) && p.CompanyId == companyId)
+            .Select(p => new { p.ProductId, Kategori = p.Kategori ?? "Diğer" })
+            .ToListAsync();
+
+        var catMap = productCategories.ToDictionary(p => p.ProductId, p => p.Kategori);
+
+        var grouped = saleItems
+            .GroupBy(i => catMap.TryGetValue(i.ProductId, out var k) ? k : "Diğer")
+            .Select(g => new { Kategori = g.Key, Total = g.Sum(i => i.LineTotal) })
+            .OrderByDescending(g => g.Total)
+            .ToList();
+
+        var totalRevenue = grouped.Sum(g => g.Total);
+
+        return grouped.Select(g => new CategorySalesItemDto
+        {
+            Kategori = g.Kategori,
+            TotalRevenue = Math.Round(g.Total, 2),
+            Percentage = totalRevenue > 0 ? Math.Round(g.Total / totalRevenue * 100, 1) : 0,
+        }).ToList();
     }
 
     // ─── Yardımcı ────────────────────────────────────────────────────────────

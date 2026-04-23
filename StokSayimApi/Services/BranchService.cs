@@ -20,6 +20,22 @@ public class BranchService
         _logger.LogInformation("Fetching branches for company: {CompanyId}", companyId);
         return await _db.Branches
             .Where(b => b.CompanyId == companyId)
+            .OrderBy(b => b.Name)
+            .ToListAsync();
+    }
+
+    /// <summary>
+    /// Belirli bir kullanıcıya atanmış şubeleri döndürür (user rolü için).
+    /// </summary>
+    public async Task<List<Branch>> GetBranchesByUserAsync(int userId, int companyId)
+    {
+        _logger.LogInformation("Fetching branches for user: {UserId}", userId);
+        return await _db.UserBranches
+            .Where(ub => ub.UserId == userId)
+            .Include(ub => ub.Branch)
+            .Where(ub => ub.Branch.CompanyId == companyId)
+            .Select(ub => ub.Branch)
+            .OrderBy(b => b.Name)
             .ToListAsync();
     }
 
