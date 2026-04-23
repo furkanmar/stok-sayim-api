@@ -58,11 +58,17 @@ public class ProductService
             .OrderBy(g => g.Key)
             .Select(g =>
             {
-                // Her unit_type için en güncel fiyatı bul
+                // Her unit_type için en güncel fiyatı bul.
+                // Eğer birime özgü fiyat yoksa (eski SecMarket sync kayıtları ADT olarak geldi)
+                // ADT fiyatına fallback yap.
                 var latestPrice = product.Prices
                     .Where(pr => pr.UnitType == g.Key)
                     .OrderByDescending(pr => pr.GecerlilikTarihi)
-                    .FirstOrDefault();
+                    .FirstOrDefault()
+                    ?? product.Prices
+                        .Where(pr => pr.UnitType == "ADT")
+                        .OrderByDescending(pr => pr.GecerlilikTarihi)
+                        .FirstOrDefault();
 
                 return new BarcodeGroupDto
                 {
@@ -307,15 +313,31 @@ public class ProductService
 
         var productIds = products.Select(p => p.ProductId).ToList();
 
-        // ADT fiyatlarını tek sorguda çek — sonra client-side en güncel olanı al
-        var allAdtPrices = await _db.ProductPrices
-            .Where(pp => productIds.Contains(pp.ProductId) && pp.UnitType == "ADT")
+        // Tüm fiyatları çek — birime özgü fiyat yoksa ADT'ye fallback yapılacak
+        var allPrices = await _db.ProductPrices
+            .Where(pp => productIds.Contains(pp.ProductId))
             .OrderByDescending(pp => pp.GecerlilikTarihi)
             .ToListAsync();
 
-        var latestPrices = allAdtPrices
-            .GroupBy(pp => pp.ProductId)
+        // Her ürün + birim tipi için en güncel fiyat haritası
+        var priceMap = allPrices
+            .GroupBy(pp => (pp.ProductId, pp.UnitType))
             .ToDictionary(g => g.Key, g => (double?)g.First().SatisFiyati);
+
+        // Ürünün kendi Unit değerine göre fiyat al; yoksa ADT'ye düş
+        var productUnits = await _db.Products
+            .Where(p => productIds.Contains(p.ProductId))
+            .Select(p => new { p.ProductId, p.Unit })
+            .ToDictionaryAsync(x => x.ProductId, x => x.Unit);
+
+        var latestPrices = productIds.ToDictionary(
+            id => id,
+            id =>
+            {
+                var unit = productUnits.GetValueOrDefault(id, "ADT");
+                return priceMap.GetValueOrDefault((id, unit))
+                    ?? priceMap.GetValueOrDefault((id, "ADT"));
+            });
 
         var items = products.Select(p => new ProductListItemDto
         {
@@ -380,7 +402,9 @@ public class ProductService
             ProductName  = pb.Product.ProductName,
             UnitType     = pb.UnitType,
             UnitQuantity = pb.UnitQuantity,
-            SatisFiyati  = latestPriceMap.GetValueOrDefault((pb.ProductId, pb.UnitType)),
+            // Birime özgü fiyat yoksa ADT'ye fallback (eski sync kayıtları için)
+            SatisFiyati  = latestPriceMap.GetValueOrDefault((pb.ProductId, pb.UnitType))
+                        ?? latestPriceMap.GetValueOrDefault((pb.ProductId, "ADT")),
             KdvOrani     = pb.Product.KdvOrani,
         }).ToList();
 

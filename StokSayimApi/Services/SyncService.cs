@@ -132,26 +132,33 @@ public class SyncService
             barcodesAdded += newBarcodes.Count;
         }
 
-        // ─── Satış fiyatlarını ekle (kasa_fiyati → ADT satisFiyati) ──────────
+        // ─── Satış fiyatlarını ekle (kasa_fiyati → ürünün gerçek birim tipinde) ──
         var sqlitePrices = ReadPricesFromSqlite(dbFilePath);
 
-        // Zaten fiyatı olan ürünleri atla (idempotent)
-        var existingPriceProductIds = await _db.ProductPrices
-            .Where(pp => pp.UnitType == "ADT" && allProductIds.Contains(pp.ProductId))
-            .Select(pp => pp.ProductId)
-            .Distinct()
-            .ToHashSetAsync();
+        // Ürün birim tipi haritası — KG/GR/L/ML ürünlerde fiyat doğru birimde kaydedilsin
+        var productUnitMap = products.ToDictionary(p => p.ProductId, p => p.Unit);
+
+        // Zaten fiyatı olan (productId, unitType) çiftlerini atla (idempotent)
+        var existingPriceKeys = await _db.ProductPrices
+            .Where(pp => allProductIds.Contains(pp.ProductId))
+            .Select(pp => new { pp.ProductId, pp.UnitType })
+            .ToListAsync();
+        var existingPriceSet = existingPriceKeys
+            .Select(x => (x.ProductId, x.UnitType))
+            .ToHashSet();
 
         var newPrices = new List<ProductPrice>();
         foreach (var sp in sqlitePrices)
         {
-            if (existingPriceProductIds.Contains(sp.ProductId)) continue;
             if (!allProductIds.Contains(sp.ProductId)) continue;
+
+            var unitType = productUnitMap.GetValueOrDefault(sp.ProductId, "ADT");
+            if (existingPriceSet.Contains((sp.ProductId, unitType))) continue;
 
             newPrices.Add(new ProductPrice
             {
                 ProductId          = sp.ProductId,
-                UnitType           = "ADT",
+                UnitType           = unitType,
                 AlisFiyati         = 0,
                 SatisFiyati        = sp.KasaFiyati,
                 GecerlilikTarihi   = DateTime.UtcNow,
