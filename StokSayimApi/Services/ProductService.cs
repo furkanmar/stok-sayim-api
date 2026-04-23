@@ -350,6 +350,51 @@ public class ProductService
             .ToListAsync();
     }
 
+    // ─── POS Export — tüm barkodlar + güncel fiyatlar (tek sorgu) ────────────
+
+    public async Task<PosExportResultDto> GetPosExportAsync(int companyId)
+    {
+        // Tüm barkodları + ürün bilgilerini tek JOIN ile çek
+        var barcodes = await _db.ProductBarcodes
+            .Where(pb => pb.CompanyId == companyId)
+            .Include(pb => pb.Product)
+            .ToListAsync();
+
+        var productIds = barcodes.Select(pb => pb.ProductId).Distinct().ToList();
+
+        // Her ürün + birim tipi için en güncel fiyatı çek
+        var prices = await _db.ProductPrices
+            .Where(pp => productIds.Contains(pp.ProductId))
+            .OrderByDescending(pp => pp.GecerlilikTarihi)
+            .ToListAsync();
+
+        // productId + unitType → en güncel SatisFiyati
+        var latestPriceMap = prices
+            .GroupBy(pp => (pp.ProductId, pp.UnitType))
+            .ToDictionary(g => g.Key, g => (double?)g.First().SatisFiyati);
+
+        var entries = barcodes.Select(pb => new PosExportEntryDto
+        {
+            Barcode      = pb.Barcode,
+            ProductId    = pb.ProductId,
+            ProductName  = pb.Product.ProductName,
+            UnitType     = pb.UnitType,
+            UnitQuantity = pb.UnitQuantity,
+            SatisFiyati  = latestPriceMap.GetValueOrDefault((pb.ProductId, pb.UnitType)),
+            KdvOrani     = pb.Product.KdvOrani,
+        }).ToList();
+
+        _logger.LogInformation("POS export: {Count} barkod, CompanyId={CompanyId}",
+            entries.Count, companyId);
+
+        return new PosExportResultDto
+        {
+            ExportedAt = DateTime.UtcNow,
+            EntryCount = entries.Count,
+            Entries    = entries,
+        };
+    }
+
     // ─── Fiyat geçmişi ────────────────────────────────────────────────────────
 
     public async Task<List<ProductPrice>> GetPriceHistoryAsync(int productId)

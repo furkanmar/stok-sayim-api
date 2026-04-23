@@ -162,6 +162,19 @@ public class ProductController : ControllerBase
         return Ok(kategoriler);
     }
 
+    // ─── POS Export — tüm barkodlar + güncel fiyatlar ────────────────────────
+
+    /// <summary>
+    /// POS cihazı için tam ürün dump'ı — offline çalışma için kullanılır.
+    /// Her barkod için: productId, productName, unitType, unitQuantity, satisFiyati, kdvOrani.
+    /// </summary>
+    [HttpGet("export")]
+    public async Task<IActionResult> GetPosExport()
+    {
+        var result = await _productService.GetPosExportAsync(GetCompanyId());
+        return Ok(result);
+    }
+
     // ─── Fiyat geçmişi ────────────────────────────────────────────────────────
 
     [HttpGet("{id:int}/prices")]

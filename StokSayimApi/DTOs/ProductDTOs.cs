@@ -101,6 +101,26 @@ public class ProductListResultDto
     public bool HasMore { get; set; }
 }
 
+/// <summary>POS cihazı için tek bir barkod → ürün kaydı (export dump)</summary>
+public class PosExportEntryDto
+{
+    public string Barcode { get; set; } = string.Empty;
+    public int ProductId { get; set; }
+    public string ProductName { get; set; } = string.Empty;
+    public string UnitType { get; set; } = string.Empty;
+    public double? UnitQuantity { get; set; }
+    public double? SatisFiyati { get; set; }
+    public int KdvOrani { get; set; }
+}
+
+/// <summary>POS export yanıtı — meta bilgi + tüm barkodlar</summary>
+public class PosExportResultDto
+{
+    public DateTime ExportedAt { get; set; }
+    public int EntryCount { get; set; }
+    public List<PosExportEntryDto> Entries { get; set; } = new();
+}
+
 /// <summary>Sync sonuç özeti</summary>
 public class SyncResultDto
 {
