@@ -129,6 +129,7 @@ public class SyncResultDto
     public int ProductsAdded { get; set; }
     public int BarcodesAdded { get; set; }
     public int BarcodesSkipped { get; set; }
+    public int PricesAdded { get; set; }
     public string Status { get; set; } = "success";
     public string? Notes { get; set; }
 }

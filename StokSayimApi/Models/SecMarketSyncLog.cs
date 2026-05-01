@@ -8,6 +8,7 @@ public class SecMarketSyncLog
     public int ProductsAdded { get; set; }
     public int BarcodesAdded { get; set; }
     public int BarcodesSkipped { get; set; }
+    public int PricesAdded { get; set; }
 
     /// <summary>success / partial / failed</summary>
     public string Status { get; set; } = "success";
