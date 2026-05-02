@@ -78,6 +78,7 @@ public class SyncController : ControllerBase
             h.ProductsAdded,
             h.BarcodesAdded,
             h.BarcodesSkipped,
+            h.PricesAdded,
             h.Status,
             h.Notes
         }));
