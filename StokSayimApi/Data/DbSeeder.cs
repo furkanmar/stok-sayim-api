@@ -44,81 +44,167 @@ public static class DbSeeder
         // Kategoriler
         var categories = new List<(string Name, List<string> Subs)>
         {
-            ("İçecek", new List<string>
+            ("ALKOLLÜ İÇECEKLER", new List<string>
             {
-                "Su", "Maden Suyu & Soda", "Meyve Suyu", "Gazlı İçecek", "Enerji İçeceği",
-                "Süt", "Bitkisel Süt", "Çay", "Kahve", "Şalgam & Ayran", "Hoşaf & Komposto"
+                "ALKOLLÜ İÇKİLER-1",
             }),
-            ("Atıştırmalık & Şekerleme", new List<string>
+            ("ATIŞTIRMALIK ÜRÜNLER", new List<string>
             {
-                "Çikolata", "Gofret", "Cips & Kraker", "Kuruyemiş", "Sakız", "Şeker & Lolipop",
-                "Bisküvi", "Kek & Pasta", "Lokum & Helva", "Meyve Kurusu"
+                "ATIŞTIRMALIK ŞEKERLER",
+                "BİSKÜVİLER",
+                "CİPSLER",
+                "EKMEK VE DİĞER UNLU MAMÜLLER",
+                "Ekmek ve Unlu Mamüller",
+                "KEKLER",
+                "KUMANYA KOLISI",
+                "KURUYEMİŞ VE KURU MEYVELER",
+                "SAKIZLAR",
+                "ÇİKOLATA KAPLAMALILAR",
+                "ÇİKOLATALAR",
             }),
-            ("Süt & Süt Ürünleri", new List<string>
+            ("DONUK ÜRÜNLER", new List<string>
             {
-                "Süt", "Yoğurt", "Peynir", "Beyaz Peynir", "Kaşar & Dil Peyniri",
-                "Tereyağı", "Margarin", "Kaymak & Krema", "Ayran", "Kefir"
+                "DONUK ET",
+                "DONUK HİNDİ ETLERİ",
+                "DONUK PİLİÇ",
             }),
-            ("Et & Et Ürünleri", new List<string>
+            ("ET VE ET ÜRÜNLERİ", new List<string>
             {
-                "Kırmızı Et", "Tavuk & Kanatlı", "Balık & Deniz Ürünleri",
-                "Salam & Sosis", "Sucuk & Pastırma", "Hindi Ürünleri", "Hazır Köfte"
+                "BALIK ve SU ÜRÜNLERİ",
+                "KIRMIZI ETLER",
+                "KURBANLIKLAR",
+                "PİLİÇ ve KANATLILAR",
+                "SAKATATLAR",
+                "SUCUK,SALAM,SOSİS VE DİĞ.İŞL.Ü",
+                "YUMURTALAR",
+                "İŞLENMİŞ ET ÜRÜNLERİ",
             }),
-            ("Ekmek & Unlu Mamuller", new List<string>
+            ("GIDA DIŞI ÜRÜNLER", new List<string>
             {
-                "Ekmek", "Simit & Açma", "Poğaça & Börek", "Sandviç Ekmeği",
-                "Tost Ekmeği", "Pasta & Kek", "Kruvasan", "Pide & Lavaş"
+                "ALIŞVERİŞ POŞEDİ",
+                "AYDINLATMA ÜRÜNLERİ",
+                "BULAŞIK TEMİZLEME GEREÇLERİ",
+                "DİĞER EV GEREÇLERİ",
+                "DİĞER GIDA DIŞI ÜRÜNLER",
+                "EV TEMİZLEME VE BAKIM ÜRÜNLERİ",
+                "FOTOKOPİ KAĞITLARI",
+                "MUTFAK EŞYA VE GEREÇLERİ",
+                "NAYLON-PLASTİK AMBALAJ MALZEME",
+                "SPOT ELEKTRONİK",
+                "TELEFON KARTLARI",
+                "TELEKOMÜNİKASYON",
+                "ÇAMAŞIR-GİYSİ BAKIM GEREÇLERİ",
             }),
-            ("Meyve & Sebze", new List<string>
+            ("HEDİYE ÇEKLERİ", new List<string>
             {
-                "Taze Meyve", "Taze Sebze", "Yeşillik & Salata", "Patates & Soğan & Sarımsak",
-                "Mantar", "Meyve Kurusu", "Zeytin"
+                "HEDİYE ÇEKLERİ",
             }),
-            ("Bakliyat & Tahıl & Kuru Gıda", new List<string>
+            ("KAĞIT ÜRÜNLERİ", new List<string>
             {
-                "Pirinç", "Bulgur & Kuskus", "Mercimek", "Nohut", "Kuru Fasulye",
-                "Makarna", "Erişte & Şehriye", "Un & İrmik", "Mısır Unu & Nişasta"
+                "ENDÜSTRİYEL KAĞIT ÜRÜNLERİ",
+                "HASTA BEZİ VE DİĞER",
+                "HİJYENİK PEDLER",
+                "KAĞIT MENDİLLER",
+                "KAĞIT PEÇETE ve HAVLULAR",
+                "TUVALET KAĞITLARI",
+                "ÇOCUK BEZLERİ",
             }),
-            ("Yağ & Sos & Baharat", new List<string>
+            ("KRİSTAL ÇUVAL ŞEKER", new List<string>
             {
-                "Zeytinyağı", "Ayçiçek Yağı", "Mısırözü Yağı", "Salça", "Ketçap & Mayonez",
-                "Hardal & Sos", "Baharat", "Tuz & Karabiber", "Sirke", "Nar Ekşisi"
+                "25KG KRİSTAL TOZ ŞEKER",
+                "50KG KRİSTAL TOZ ŞEKER",
             }),
-            ("Kahvaltılık & Reçel", new List<string>
+            ("KURU GIDA", new List<string>
             {
-                "Reçel & Marmelat", "Bal & Pekmez", "Fıstık Ezmesi & Tahin",
-                "Çikolatalı Krema", "Zeytin", "Turşu", "Konserve Ürünler"
+                "BAKLİYAT",
+                "KETÇAP-MAYONEZ-SOSLAR",
+                "KONSERVE-TURŞU-HAZIR YEMEKLER",
+                "MAKARNA",
+                "MAMA VE BESİN ÇEŞİTLERİ",
+                "TOZ TATLI-PASTA MALZEMELERİ",
+                "UN",
+                "ÇORBA-BULYON-TUZ-BAHARAT",
+                "ŞEKERLER",
             }),
-            ("Dondurulmuş Ürünler", new List<string>
+            ("KİŞİSEL BAKIM ÜRÜNLERİ", new List<string>
             {
-                "Dondurulmuş Sebze", "Dondurulmuş Et & Balık",
-                "Hazır Yemek", "Dondurma", "Pizza & Börek (Dondurulmuş)"
+                "BEBEK BAKIM ÜRÜNLERİ",
+                "CİLT BAKIM ÜRÜNLERİ",
+                "DEODORANTLAR- PARFÜMLER VE DİĞ",
+                "DİŞ MACUNU ve DİŞ BAKIM ÜRÜNL.",
+                "KOLONYALAR",
+                "SABUNLAR",
+                "SAÇ ŞEKİLLENDİRİCİLER- DİĞER S",
+                "TRAŞ KREMLERİ VE TRAŞ ÜRÜNLERİ",
+                "ŞAMPUANLAR ve SAÇ KREMLERİ",
             }),
-            ("Temizlik Ürünleri", new List<string>
+            ("PALETLER", new List<string>
             {
-                "Çamaşır Deterjanı", "Çamaşır Suyu & Yumuşatıcı", "Bulaşık Deterjanı",
-                "Yer Temizleyici", "Tuvalet Temizleyici", "Cam & Yüzey Temizleyici",
-                "Dezenfektan", "Çöp Poşeti", "Kağıt Havlu & Peçete"
+                "PALETLER",
             }),
-            ("Kişisel Bakım", new List<string>
+            ("SEBZE&MEYVE", new List<string>
             {
-                "Şampuan & Saç Bakım", "Sabun & Duş Jeli", "Diş Macunu & Fırçası",
-                "Deodorant", "Cilt Bakım & Krem", "Tıraş Ürünleri",
-                "Islak Mendil", "Makyaj & Kozmetik"
+                "MEYVE",
+                "MEYVE SEBZE AMBALAJLARI",
+                "SEBZE",
             }),
-            ("Bebek & Çocuk", new List<string>
+            ("SICAK İÇECEKLER", new List<string>
             {
-                "Bebek Bezi", "Islak Mendil (Bebek)", "Bebek Maması", "Bebek Şampuanı & Losyonu",
-                "Çocuk Atıştırmalığı", "Biberon & Aksesuar"
+                "KAHVE",
+                "KAHVE VE KAHVE KREMALARI",
+                "SİYAH ÇAYLAR",
+                "ÇAY",
+                "ÇAYKUR",
             }),
-            ("Evcil Hayvan", new List<string>
+            ("SIVI YAĞ VE MARGARİN", new List<string>
             {
-                "Kedi Maması", "Köpek Maması", "Kuş Maması", "Evcil Hayvan Aksesuarı"
+                "AYÇİÇEK YAĞLARI",
+                "ENDÜSTRİYEL TİP MARGARİNLER",
+                "EV TİPİ MARGARİNLER",
+                "KARIŞIM YAĞLAR",
+                "MISIR YAĞLARI",
+                "ZEYTİN YAĞLARI",
             }),
-            ("Kırtasiye & Ev Gereçleri", new List<string>
+            ("SOĞUK İÇECEKLER", new List<string>
             {
-                "Pil & Şarj", "Ampul & Aydınlatma", "Naylon & Poşet", "Folyo & Streç Film",
-                "Kağıt Ürünleri", "Kalem & Defter", "Yapıştırıcı & Bant"
+                "BUZLU ÇAYLAR",
+                "ENERJİ İÇECEKLERİ",
+                "GAZLI İÇECEKLER",
+                "MEYVE SULARI",
+                "SODALAR",
+                "SULAR",
+                "ÖZEL SOĞUK İÇECEKLER",
+            }),
+            ("SÜT VE SÜT ÜRÜNLERİ", new List<string>
+            {
+                "DONDURMALAR",
+                "DONDURULMUŞ ÜRÜNLER",
+                "PEYNİRLER",
+                "PUDİNG VE SÜTLÜ TATLILAR",
+                "SÜTLER",
+                "TEREYAĞ-KREMALAR",
+                "YOĞURT-AYRANLAR",
+            }),
+            ("SİGARALAR VE DİĞER TÜTÜN ÜRÜNLERİ", new List<string>
+            {
+                "SİGARALAR VE DİĞER TÜTÜN ÜRÜNLERİ",
+            }),
+            ("TEMİZLİK ÜRÜNLERİ", new List<string>
+            {
+                "BULAŞIK TEMİZLEME ÜRÜNLERİ",
+                "DİĞER TEMİZLEME ÜRÜNLERİ",
+                "EV-YÜZEY TEMİZLİME ÜRÜNLERİ",
+                "ÇAMAŞIR TEMİZLEME ÜRÜNLERİ",
+            }),
+            ("ŞARK. VE KAHV. ÜRÜNLERİ", new List<string>
+            {
+                "FINDIK KREMALARI- FINDIK FISTI",
+                "KREM ÇİKOLATA",
+                "MEZE ÇEŞİTLERİ",
+                "PEKMEZ- TAHİN- HELVA VB.",
+                "REÇEL- MARMELAT VE BALLAR",
+                "TAHIL GEVREKLERİ",
+                "ZEYTİNLER",
             }),
         };
 
