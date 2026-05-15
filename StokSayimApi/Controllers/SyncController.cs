@@ -28,7 +28,7 @@ public class SyncController : ControllerBase
     /// Multipart form-data: dosya "file" alanında gönderilmeli.
     /// </summary>
     [HttpPost("secmarket")]
-    [RequestSizeLimit(50 * 1024 * 1024)] // 50 MB
+    [RequestSizeLimit(100 * 1024 * 1024)] // 100 MB
     public async Task<IActionResult> SyncFromUpload(IFormFile file)
     {
         if (file == null || file.Length == 0)

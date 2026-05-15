@@ -24,6 +24,7 @@ public class SyncService
     ///   product_barcodes(product_id, barcode, unit_type, unit_quantity)
     ///   product_prices  (product_id, alis_fiyati, satis_fiyati)
     /// İdempotent: zaten varolan kayıtları atlar.
+    /// Tüm insert'ler tek transaction içinde — hata durumunda rollback.
     /// </summary>
     public async Task<SyncResultDto> SyncFromSqliteAsync(string dbFilePath, int companyId)
     {
@@ -42,169 +43,179 @@ public class SyncService
             "SQLite read complete — {P} products, {B} barcodes, {Pr} prices",
             products.Count, barcodes.Count, prices.Count);
 
-        // ─── Mevcut ProductId'leri önbelleğe al ─────────────────────────────
-        var existingProductIds = await _db.Products
-            .Where(p => p.CompanyId == companyId)
-            .Select(p => p.ProductId)
-            .ToHashSetAsync();
-
-        // ─── Mevcut (Barcode, UnitType) çiftlerini önbelleğe al ─────────────
-        var existingBarcodes = await _db.ProductBarcodes
-            .Where(pb => pb.CompanyId == companyId)
-            .Select(pb => new { pb.Barcode, pb.UnitType })
-            .ToHashSetAsync();
-
-        int productsAdded  = 0;
-        int barcodesAdded  = 0;
+        int productsAdded   = 0;
+        int barcodesAdded   = 0;
         int barcodesSkipped = 0;
+        int pricesAdded     = 0;
 
-        // ─── Ürünleri ekle ──────────────────────────────────────────────────
-        var newProducts = new List<Product>();
-        foreach (var p in products)
+        // ─── Tüm insert'leri tek transaction içine al ────────────────────────
+        await using var tx = await _db.Database.BeginTransactionAsync();
+        try
         {
-            if (existingProductIds.Contains(p.ProductId)) continue;
+            // ─── Mevcut ProductId'leri önbelleğe al ─────────────────────────
+            var existingProductIds = await _db.Products
+                .Where(p => p.CompanyId == companyId)
+                .Select(p => p.ProductId)
+                .ToHashSetAsync();
 
-            newProducts.Add(new Product
+            // ─── Mevcut (Barcode, UnitType) çiftlerini önbelleğe al ─────────
+            var existingBarcodes = await _db.ProductBarcodes
+                .Where(pb => pb.CompanyId == companyId)
+                .Select(pb => new { pb.Barcode, pb.UnitType })
+                .ToHashSetAsync();
+
+            // ─── Ürünleri 500'lük batch'lerle ekle ──────────────────────────
+            const int batchSize = 500;
+            var now = DateTime.UtcNow;
+
+            var newProducts = products
+                .Where(p => !existingProductIds.Contains(p.ProductId))
+                .Select(p => new Product
+                {
+                    ProductId   = p.ProductId,
+                    ProductName = p.ProductName,
+                    Unit        = p.Unit,
+                    Content     = p.Content,
+                    KdvOrani    = (int)(p.KdvOrani ?? 20),
+                    Kategori    = p.Kategori,
+                    AltKategori = p.AltKategori,
+                    Marka       = p.Marka,
+                    CompanyId   = companyId,
+                    CreatedAt   = now,
+                    UpdatedAt   = now
+                })
+                .ToList();
+
+            for (int i = 0; i < newProducts.Count; i += batchSize)
             {
-                ProductId   = p.ProductId,
-                ProductName = p.ProductName,
-                Unit        = p.Unit,
-                Content     = p.Content,
-                KdvOrani    = (int)(p.KdvOrani ?? 20),
-                Kategori    = p.Kategori,
-                AltKategori = p.AltKategori,
-                Marka       = p.Marka,
-                CompanyId   = companyId,
-                CreatedAt   = DateTime.UtcNow,
-                UpdatedAt   = DateTime.UtcNow
-            });
-        }
-
-        if (newProducts.Count > 0)
-        {
-            await _db.Products.AddRangeAsync(newProducts);
-            await _db.SaveChangesAsync();
-            productsAdded = newProducts.Count;
-            _logger.LogInformation("Added {Count} new products", productsAdded);
-        }
-
-        // ─── Barkodları toplu ekle ───────────────────────────────────────────
-        var allProductIds = await _db.Products
-            .Where(p => p.CompanyId == companyId)
-            .Select(p => p.ProductId)
-            .ToHashSetAsync();
-
-        const int batchSize = 500;
-        var newBarcodes = new List<ProductBarcode>();
-
-        foreach (var b in barcodes)
-        {
-            if (!allProductIds.Contains(b.ProductId)) continue;
-
-            var key = new { b.Barcode, b.UnitType };
-            if (existingBarcodes.Contains(key))
-            {
-                barcodesSkipped++;
-                continue;
+                var batch = newProducts.Skip(i).Take(batchSize).ToList();
+                await _db.Products.AddRangeAsync(batch);
+                await _db.SaveChangesAsync();
+                productsAdded += batch.Count;
             }
 
-            newBarcodes.Add(new ProductBarcode
+            if (productsAdded > 0)
+                _logger.LogInformation("Added {Count} new products", productsAdded);
+
+            // ─── allProductIds: re-query yok, union ile türet ────────────────
+            existingProductIds.UnionWith(newProducts.Select(p => p.ProductId));
+            var allProductIds = existingProductIds;
+
+            // ─── Barkodları 500'lük batch'lerle ekle ────────────────────────
+            var newBarcodes = new List<ProductBarcode>();
+
+            foreach (var b in barcodes)
             {
-                ProductId    = b.ProductId,
-                Barcode      = b.Barcode,
-                UnitType     = b.UnitType,
-                UnitQuantity = b.UnitQuantity,
-                CompanyId    = companyId,
-                CreatedAt    = DateTime.UtcNow
-            });
+                if (!allProductIds.Contains(b.ProductId)) continue;
 
-            existingBarcodes.Add(key);
+                var key = new { b.Barcode, b.UnitType };
+                if (existingBarcodes.Contains(key))
+                {
+                    barcodesSkipped++;
+                    continue;
+                }
 
-            if (newBarcodes.Count >= batchSize)
+                newBarcodes.Add(new ProductBarcode
+                {
+                    ProductId    = b.ProductId,
+                    Barcode      = b.Barcode,
+                    UnitType     = b.UnitType,
+                    UnitQuantity = b.UnitQuantity,
+                    CompanyId    = companyId,
+                    CreatedAt    = now
+                });
+
+                existingBarcodes.Add(key);
+
+                if (newBarcodes.Count >= batchSize)
+                {
+                    await _db.ProductBarcodes.AddRangeAsync(newBarcodes);
+                    await _db.SaveChangesAsync();
+                    barcodesAdded += newBarcodes.Count;
+                    newBarcodes.Clear();
+                }
+            }
+
+            if (newBarcodes.Count > 0)
             {
                 await _db.ProductBarcodes.AddRangeAsync(newBarcodes);
                 await _db.SaveChangesAsync();
                 barcodesAdded += newBarcodes.Count;
-                newBarcodes.Clear();
             }
-        }
 
-        if (newBarcodes.Count > 0)
-        {
-            await _db.ProductBarcodes.AddRangeAsync(newBarcodes);
-            await _db.SaveChangesAsync();
-            barcodesAdded += newBarcodes.Count;
-        }
+            // ─── Fiyatları 500'lük batch'lerle ekle ─────────────────────────
+            var productUnitMap = products.ToDictionary(p => p.ProductId, p => p.Unit);
 
-        // ─── Fiyatları ekle ─────────────────────────────────────────────────
-        // Ürün birim tipi haritası — KG/GR/L/ML ürünlerde fiyat doğru birimde kaydedilsin
-        var productUnitMap = products.ToDictionary(p => p.ProductId, p => p.Unit);
+            var existingPriceSet = (await _db.ProductPrices
+                .Where(pp => allProductIds.Contains(pp.ProductId))
+                .Select(pp => new { pp.ProductId, pp.UnitType })
+                .ToListAsync())
+                .Select(x => (x.ProductId, x.UnitType))
+                .ToHashSet();
 
-        // Zaten fiyatı olan (productId, unitType) çiftlerini atla (idempotent)
-        var existingPriceSet = (await _db.ProductPrices
-            .Where(pp => allProductIds.Contains(pp.ProductId))
-            .Select(pp => new { pp.ProductId, pp.UnitType })
-            .ToListAsync())
-            .Select(x => (x.ProductId, x.UnitType))
-            .ToHashSet();
-
-        var newPrices = new List<ProductPrice>();
-        foreach (var sp in prices)
-        {
-            if (!allProductIds.Contains(sp.ProductId)) continue;
-
-            var unitType = productUnitMap.GetValueOrDefault(sp.ProductId, "ADT");
-            if (existingPriceSet.Contains((sp.ProductId, unitType))) continue;
-
-            newPrices.Add(new ProductPrice
+            var newPrices = new List<ProductPrice>();
+            foreach (var sp in prices)
             {
-                ProductId        = sp.ProductId,
-                UnitType         = unitType,
-                AlisFiyati       = sp.AlisFiyati ?? 0,
-                SatisFiyati      = sp.SatisFiyati ?? 0,
-                GecerlilikTarihi = DateTime.UtcNow,
-                OlusturanUserId  = null
-            });
-        }
+                if (!allProductIds.Contains(sp.ProductId)) continue;
 
-        int pricesAdded = 0;
-        const int priceBatch = 500;
-        for (int i = 0; i < newPrices.Count; i += priceBatch)
-        {
-            var batch = newPrices.Skip(i).Take(priceBatch).ToList();
-            await _db.ProductPrices.AddRangeAsync(batch);
+                var unitType = productUnitMap.GetValueOrDefault(sp.ProductId, "ADT");
+                if (existingPriceSet.Contains((sp.ProductId, unitType))) continue;
+
+                newPrices.Add(new ProductPrice
+                {
+                    ProductId        = sp.ProductId,
+                    UnitType         = unitType,
+                    AlisFiyati       = sp.AlisFiyati ?? 0,
+                    SatisFiyati      = sp.SatisFiyati ?? 0,
+                    GecerlilikTarihi = now,
+                    OlusturanUserId  = null
+                });
+            }
+
+            for (int i = 0; i < newPrices.Count; i += batchSize)
+            {
+                var batch = newPrices.Skip(i).Take(batchSize).ToList();
+                await _db.ProductPrices.AddRangeAsync(batch);
+                await _db.SaveChangesAsync();
+                pricesAdded += batch.Count;
+            }
+
+            // ─── Sync kaydı oluştur ve commit ────────────────────────────────
+            var log = new SecMarketSyncLog
+            {
+                SyncedAt        = now,
+                SourceFile      = sourceFile,
+                ProductsAdded   = productsAdded,
+                BarcodesAdded   = barcodesAdded,
+                BarcodesSkipped = barcodesSkipped,
+                PricesAdded     = pricesAdded,
+                Status          = "success"
+            };
+            _db.SecMarketSyncLogs.Add(log);
             await _db.SaveChangesAsync();
-            pricesAdded += batch.Count;
+
+            await tx.CommitAsync();
+
+            _logger.LogInformation(
+                "Sync complete — products: {PA}, barcodes: {BA} (+{BS} skipped), prices: {PrA}",
+                productsAdded, barcodesAdded, barcodesSkipped, pricesAdded);
+
+            return new SyncResultDto
+            {
+                SyncedAt        = log.SyncedAt,
+                SourceFile      = log.SourceFile,
+                ProductsAdded   = productsAdded,
+                BarcodesAdded   = barcodesAdded,
+                BarcodesSkipped = barcodesSkipped,
+                PricesAdded     = pricesAdded,
+                Status          = "success"
+            };
         }
-
-        _logger.LogInformation(
-            "Sync complete — products: {PA}, barcodes: {BA} (+{BS} skipped), prices: {PrA}",
-            productsAdded, barcodesAdded, barcodesSkipped, pricesAdded);
-
-        // ─── Sync kaydı oluştur ───────────────────────────────────────────────
-        var log = new SecMarketSyncLog
+        catch
         {
-            SyncedAt        = DateTime.UtcNow,
-            SourceFile      = sourceFile,
-            ProductsAdded   = productsAdded,
-            BarcodesAdded   = barcodesAdded,
-            BarcodesSkipped = barcodesSkipped,
-            PricesAdded     = pricesAdded,
-            Status          = "success"
-        };
-        _db.SecMarketSyncLogs.Add(log);
-        await _db.SaveChangesAsync();
-
-        return new SyncResultDto
-        {
-            SyncedAt        = log.SyncedAt,
-            SourceFile      = log.SourceFile,
-            ProductsAdded   = productsAdded,
-            BarcodesAdded   = barcodesAdded,
-            BarcodesSkipped = barcodesSkipped,
-            PricesAdded     = pricesAdded,
-            Status          = "success"
-        };
+            await tx.RollbackAsync();
+            throw;
+        }
     }
 
     /// <summary>Sync geçmişini döndür (en yeni 20 kayıt)</summary>
