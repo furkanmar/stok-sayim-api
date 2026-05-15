@@ -286,7 +286,7 @@ public class ProductService
     // ─── Ürün listesi (sayfalı, filtrelenebilir) ──────────────────────────────
 
     public async Task<ProductListResultDto> GetProductListAsync(
-        string? q, string? marka, string? kategori, int page, int pageSize, int companyId)
+        string? q, string? marka, string? kategori, bool? hasPrice, int page, int pageSize, int companyId)
     {
         var query = _db.Products.Where(p => p.CompanyId == companyId);
 
@@ -296,6 +296,10 @@ public class ProductService
             query = query.Where(p => p.Marka == marka);
         if (!string.IsNullOrWhiteSpace(kategori))
             query = query.Where(p => p.Kategori == kategori);
+        if (hasPrice == true)
+            query = query.Where(p => p.Prices.Any(pp => pp.SatisFiyati > 0));
+        else if (hasPrice == false)
+            query = query.Where(p => !p.Prices.Any(pp => pp.SatisFiyati > 0));
 
         var total = await query.CountAsync();
         var offset = (page - 1) * pageSize;

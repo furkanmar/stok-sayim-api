@@ -145,11 +145,12 @@ public class ProductController : ControllerBase
         [FromQuery] string? q,
         [FromQuery] string? marka,
         [FromQuery] string? kategori,
+        [FromQuery] bool? hasPrice,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 30)
     {
         if (pageSize > 100) pageSize = 100;
-        var result = await _productService.GetProductListAsync(q, marka, kategori, page, pageSize, GetCompanyId());
+        var result = await _productService.GetProductListAsync(q, marka, kategori, hasPrice, page, pageSize, GetCompanyId());
         return Ok(result);
     }
 
