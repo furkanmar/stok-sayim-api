@@ -376,15 +376,25 @@ public class ProductService
             query = query.Where(p => p.Marka == marka);
         if (!string.IsNullOrWhiteSpace(kategori))
             query = query.Where(p => p.Kategori == kategori);
-        if (hasPrice == true)
-            query = query.Where(p => p.Prices.Any(pp => pp.SatisFiyati > 0));
-        else if (hasPrice == false)
-            query = query.Where(p => !p.Prices.Any(pp => pp.SatisFiyati > 0));
+        // Correlated subquery yerine non-correlated subquery — PostgreSQL hash join kullanır
+        if (hasPrice != null)
+        {
+            var pricedIds = _db.ProductPrices
+                .Where(pp => pp.SatisFiyati > 0)
+                .Select(pp => pp.ProductId)
+                .Distinct();
 
-        var total = await query.CountAsync();
+            query = hasPrice == true
+                ? query.Where(p => pricedIds.Contains(p.ProductId))
+                : query.Where(p => !pricedIds.Contains(p.ProductId));
+        }
+
+        // page 1'de count al; sonraki sayfalarda Flutter zaten biliyor
+        var total = page == 1 ? await query.CountAsync() : -1;
         var offset = (page - 1) * pageSize;
 
         var products = await query
+            .AsNoTracking()
             .OrderBy(p => p.ProductName)
             .Skip(offset)
             .Take(pageSize)
@@ -438,7 +448,10 @@ public class ProductService
         {
             Items   = items,
             Total   = total,
-            HasMore = offset + items.Count < total
+            // total == -1 → page 1'den öğrenilmiş olmalı; bu sayfada pageSize kadar geldiyse devam var
+            HasMore = total == -1
+                ? items.Count == pageSize
+                : offset + items.Count < total
         };
     }
 

@@ -4,3 +4,23 @@
 2026-06-02 18:54:30,213 [INFO] Gönderilecek kayıt: 7208
 2026-06-02 18:54:31,049 [WARNING] HTTP 500 attempt=1: 500 Server Error: Internal Server Error for url: https://api.marifoglu.trade/api/products/prices/bulk
 2026-06-02 18:54:33,581 [WARNING] HTTP 500 attempt=2: 500 Server Error: Internal Server Error for url: https://api.marifoglu.trade/api/products/prices/bulk
+2026-06-02 18:58:00,483 [INFO] DB: C:\dev\code\Stok_kontrol\scripts\price_updates.db
+2026-06-02 18:58:00,484 [INFO] API: https://api.marifoglu.trade
+2026-06-02 18:58:02,366 [INFO] Token alındı.
+2026-06-02 18:58:02,375 [INFO] Gönderilecek kayıt: 7208
+2026-06-02 18:58:03,127 [INFO] Chunk 1/15 — updated=31 skipped=469 notFound=0
+2026-06-02 18:58:03,373 [INFO] Chunk 2/15 — updated=17 skipped=483 notFound=0
+2026-06-02 18:58:03,672 [INFO] Chunk 3/15 — updated=22 skipped=478 notFound=0
+2026-06-02 18:58:03,918 [INFO] Chunk 4/15 — updated=22 skipped=478 notFound=0
+2026-06-02 18:58:04,212 [INFO] Chunk 5/15 — updated=27 skipped=473 notFound=0
+2026-06-02 18:58:04,531 [INFO] Chunk 6/15 — updated=30 skipped=470 notFound=0
+2026-06-02 18:58:04,764 [INFO] Chunk 7/15 — updated=32 skipped=468 notFound=0
+2026-06-02 18:58:05,001 [INFO] Chunk 8/15 — updated=30 skipped=470 notFound=0
+2026-06-02 18:58:05,257 [INFO] Chunk 9/15 — updated=44 skipped=456 notFound=0
+2026-06-02 18:58:05,499 [INFO] Chunk 10/15 — updated=9 skipped=491 notFound=0
+2026-06-02 18:58:05,749 [INFO] Chunk 11/15 — updated=26 skipped=474 notFound=0
+2026-06-02 18:58:06,090 [INFO] Chunk 12/15 — updated=18 skipped=482 notFound=0
+2026-06-02 18:58:06,577 [INFO] Chunk 13/15 — updated=32 skipped=468 notFound=0
+2026-06-02 18:58:07,011 [INFO] Chunk 14/15 — updated=59 skipped=441 notFound=0
+2026-06-02 18:58:07,292 [INFO] Chunk 15/15 — updated=9 skipped=199 notFound=0
+2026-06-02 18:58:07,293 [INFO] Tamamlandı — toplam updated=408 skipped=6800
