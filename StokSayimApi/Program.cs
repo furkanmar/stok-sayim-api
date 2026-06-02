@@ -66,6 +66,7 @@ try
             };
         });
 
+    builder.Services.AddMemoryCache();
     builder.Services.AddAuthorization();
     // Services
     builder.Services.AddScoped<JwtService>();

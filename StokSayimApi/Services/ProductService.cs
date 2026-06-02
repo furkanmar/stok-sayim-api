@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using StokSayimApi.Data;
 using StokSayimApi.Models;
 using StokSayimApi.DTOs;
@@ -9,11 +10,15 @@ public class ProductService
 {
     private readonly AppDbContext _db;
     private readonly ILogger<ProductService> _logger;
+    private readonly IMemoryCache _cache;
 
-    public ProductService(AppDbContext db, ILogger<ProductService> logger)
+    private static readonly TimeSpan _filterCacheTtl = TimeSpan.FromMinutes(10);
+
+    public ProductService(AppDbContext db, ILogger<ProductService> logger, IMemoryCache cache)
     {
         _db = db;
         _logger = logger;
+        _cache = cache;
     }
 
     // ─── Barkod ile ürün getir ─────────────────────────────────────────────────
@@ -47,10 +52,20 @@ public class ProductService
     {
         var product = await _db.Products
             .Include(p => p.Barcodes)
-            .Include(p => p.Prices)
             .FirstOrDefaultAsync(p => p.ProductId == productId && p.CompanyId == companyId);
 
         if (product == null) return null;
+
+        // Her unit_type için tek en güncel fiyatı DB'den çek — tüm geçmişi belleğe alma
+        var unitTypes = product.Barcodes.Select(b => b.UnitType).Distinct().ToList();
+
+        var latestPrices = await _db.ProductPrices
+            .Where(pp => pp.ProductId == productId)
+            .GroupBy(pp => pp.UnitType)
+            .Select(g => g.OrderByDescending(pp => pp.GecerlilikTarihi).First())
+            .ToListAsync();
+
+        var priceByUnit = latestPrices.ToDictionary(pp => pp.UnitType);
 
         // Barkodları unit_type'a göre grupla
         var barcodeGroups = product.Barcodes
@@ -58,25 +73,17 @@ public class ProductService
             .OrderBy(g => g.Key)
             .Select(g =>
             {
-                // Her unit_type için en güncel fiyatı bul.
-                // Eğer birime özgü fiyat yoksa (eski SecMarket sync kayıtları ADT olarak geldi)
-                // ADT fiyatına fallback yap.
-                var latestPrice = product.Prices
-                    .Where(pr => pr.UnitType == g.Key)
-                    .OrderByDescending(pr => pr.GecerlilikTarihi)
-                    .FirstOrDefault()
-                    ?? product.Prices
-                        .Where(pr => pr.UnitType == "ADT")
-                        .OrderByDescending(pr => pr.GecerlilikTarihi)
-                        .FirstOrDefault();
+                // Birime özgü fiyat yoksa ADT'ye fallback (eski SecMarket sync kayıtları)
+                priceByUnit.TryGetValue(g.Key, out var price);
+                price ??= priceByUnit.GetValueOrDefault("ADT");
 
                 return new BarcodeGroupDto
                 {
                     UnitType = g.Key,
                     UnitQuantity = g.First().UnitQuantity,
                     Barcodes = g.Select(b => b.Barcode).ToList(),
-                    AlisFiyati = latestPrice?.AlisFiyati,
-                    SatisFiyati = latestPrice?.SatisFiyati
+                    AlisFiyati = price?.AlisFiyati,
+                    SatisFiyati = price?.SatisFiyati
                 };
             })
             .ToList();
@@ -101,7 +108,7 @@ public class ProductService
     {
         var q = _db.Products
             .Where(p => p.CompanyId == companyId
-                     && p.ProductName.ToLower().Contains(query.ToLower()));
+                     && EF.Functions.ILike(p.ProductName, $"%{query}%"));
 
         if (!string.IsNullOrWhiteSpace(marka))
             q = q.Where(p => p.Marka == marka);
@@ -123,12 +130,18 @@ public class ProductService
 
     public async Task<List<string>> GetMarkasAsync(int companyId)
     {
-        return await _db.Products
+        var key = $"markas_{companyId}";
+        if (_cache.TryGetValue(key, out List<string>? cached)) return cached!;
+
+        var result = await _db.Products
             .Where(p => p.CompanyId == companyId && p.Marka != null && p.Marka != "")
             .Select(p => p.Marka!)
             .Distinct()
             .OrderBy(m => m)
             .ToListAsync();
+
+        _cache.Set(key, result, _filterCacheTtl);
+        return result;
     }
 
     // ─── Manuel ürün oluştur / güncelle ──────────────────────────────────────
@@ -314,14 +327,11 @@ public class ProductService
             var productIds = chunk.Select(c => c.ProductId).Distinct().ToList();
 
             // Mevcut en güncel fiyatları çek (product_id + unit_type bazında)
-            var existing = await _db.ProductPrices
+            var existingLookup = (await _db.ProductPrices
                 .Where(pp => productIds.Contains(pp.ProductId))
-                .GroupBy(pp => new { pp.ProductId, pp.UnitType })
-                .Select(g => g.OrderByDescending(pp => pp.GecerlilikTarihi).First())
-                .ToListAsync();
-
-            var existingLookup = existing
-                .ToDictionary(pp => (pp.ProductId, pp.UnitType));
+                .ToListAsync())
+                .GroupBy(pp => (pp.ProductId, pp.UnitType))
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(pp => pp.GecerlilikTarihi).First());
 
             var toAdd = new List<ProductPrice>();
 
@@ -371,7 +381,7 @@ public class ProductService
         var query = _db.Products.Where(p => p.CompanyId == companyId);
 
         if (!string.IsNullOrWhiteSpace(q))
-            query = query.Where(p => p.ProductName.ToLower().Contains(q.ToLower()));
+            query = query.Where(p => EF.Functions.ILike(p.ProductName, $"%{q}%"));
         if (!string.IsNullOrWhiteSpace(marka))
             query = query.Where(p => p.Marka == marka);
         if (!string.IsNullOrWhiteSpace(kategori))
@@ -409,10 +419,8 @@ public class ProductService
             .ToDictionary(g => g.Key, g => (double?)g.First().SatisFiyati);
 
         // Ürünün kendi Unit değerine göre fiyat al; yoksa ADT'ye düş
-        var productUnits = await _db.Products
-            .Where(p => productIds.Contains(p.ProductId))
-            .Select(p => new { p.ProductId, p.Unit })
-            .ToDictionaryAsync(x => x.ProductId, x => x.Unit);
+        // (products listesi zaten Unit içeriyor — ayrı sorgu gerekmiyor)
+        var productUnits = products.ToDictionary(p => p.ProductId, p => p.Unit);
 
         var latestPrices = productIds.ToDictionary(
             id => id,
@@ -448,12 +456,18 @@ public class ProductService
 
     public async Task<List<string>> GetKategorilerAsync(int companyId)
     {
-        return await _db.Products
+        var key = $"kategoriler_{companyId}";
+        if (_cache.TryGetValue(key, out List<string>? cached)) return cached!;
+
+        var result = await _db.Products
             .Where(p => p.CompanyId == companyId && p.Kategori != null && p.Kategori != "")
             .Select(p => p.Kategori!)
             .Distinct()
             .OrderBy(k => k)
             .ToListAsync();
+
+        _cache.Set(key, result, _filterCacheTtl);
+        return result;
     }
 
     // ─── POS Export — tüm barkodlar + güncel fiyatlar (tek sorgu) ────────────
