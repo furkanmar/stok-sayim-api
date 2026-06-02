@@ -283,6 +283,86 @@ public class ProductService
             dto.ProductId, dto.Prices.Count);
     }
 
+    // ─── Toplu fiyat güncelleme (bulk upsert) ─────────────────────────────────
+
+    public async Task<BulkPriceResultDto> BulkUpdatePricesAsync(
+        List<BulkPriceItemDto> items, int companyId, int chunkSize = 500)
+    {
+        var result = new BulkPriceResultDto();
+
+        // Şirkete ait product_id seti — sahiplik kontrolü için
+        var companyProductIds = await _db.Products
+            .Where(p => p.CompanyId == companyId)
+            .Select(p => p.ProductId)
+            .ToHashSetAsync();
+
+        var chunks = items
+            .Where(i => companyProductIds.Contains(i.ProductId))
+            .Chunk(chunkSize);
+
+        var notFound = items
+            .Where(i => !companyProductIds.Contains(i.ProductId))
+            .Select(i => i.ProductId)
+            .Distinct()
+            .ToList();
+
+        result.NotFoundIds = notFound;
+        result.Skipped = notFound.Count;
+
+        foreach (var chunk in chunks)
+        {
+            var productIds = chunk.Select(c => c.ProductId).Distinct().ToList();
+
+            // Mevcut en güncel fiyatları çek (product_id + unit_type bazında)
+            var existing = await _db.ProductPrices
+                .Where(pp => productIds.Contains(pp.ProductId))
+                .GroupBy(pp => new { pp.ProductId, pp.UnitType })
+                .Select(g => g.OrderByDescending(pp => pp.GecerlilikTarihi).First())
+                .ToListAsync();
+
+            var existingLookup = existing
+                .ToDictionary(pp => (pp.ProductId, pp.UnitType));
+
+            var toAdd = new List<ProductPrice>();
+
+            foreach (var item in chunk)
+            {
+                if (existingLookup.TryGetValue((item.ProductId, item.UnitType), out var current))
+                {
+                    // Fiyat değişmediyse atla
+                    if (Math.Abs(current.SatisFiyati - item.SatisFiyati) < 0.001)
+                    {
+                        result.Skipped++;
+                        continue;
+                    }
+                }
+
+                toAdd.Add(new ProductPrice
+                {
+                    ProductId    = item.ProductId,
+                    UnitType     = item.UnitType,
+                    AlisFiyati   = 0,
+                    SatisFiyati  = item.SatisFiyati,
+                    GecerlilikTarihi = DateTime.UtcNow,
+                    OlusturanUserId  = null,
+                });
+                result.Updated++;
+            }
+
+            if (toAdd.Count > 0)
+            {
+                await _db.ProductPrices.AddRangeAsync(toAdd);
+                await _db.SaveChangesAsync();
+            }
+        }
+
+        _logger.LogInformation(
+            "BulkUpdatePrices — updated={Updated} skipped={Skipped} notFound={NotFound}",
+            result.Updated, result.Skipped, result.NotFoundIds.Count);
+
+        return result;
+    }
+
     // ─── Ürün listesi (sayfalı, filtrelenebilir) ──────────────────────────────
 
     public async Task<ProductListResultDto> GetProductListAsync(

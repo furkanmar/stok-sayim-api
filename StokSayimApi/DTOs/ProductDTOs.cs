@@ -121,6 +121,22 @@ public class PosExportResultDto
     public List<PosExportEntryDto> Entries { get; set; } = new();
 }
 
+/// <summary>Toplu fiyat güncelleme — tek satır</summary>
+public class BulkPriceItemDto
+{
+    public int ProductId { get; set; }
+    public string UnitType { get; set; } = "ADT";
+    public double SatisFiyati { get; set; }
+}
+
+/// <summary>Toplu fiyat güncelleme sonucu</summary>
+public class BulkPriceResultDto
+{
+    public int Updated { get; set; }
+    public int Skipped { get; set; }
+    public List<int> NotFoundIds { get; set; } = new();
+}
+
 /// <summary>Sync sonuç özeti</summary>
 public class SyncResultDto
 {

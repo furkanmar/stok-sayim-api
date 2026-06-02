@@ -138,6 +138,18 @@ public class ProductController : ControllerBase
         catch (KeyNotFoundException ex) { return NotFound(new { error = ex.Message }); }
     }
 
+    // ─── Toplu fiyat güncelleme (bulk) ───────────────────────────────────────
+
+    [HttpPost("prices/bulk")]
+    public async Task<IActionResult> BulkUpdatePrices([FromBody] List<BulkPriceItemDto> items)
+    {
+        if (items == null || items.Count == 0)
+            return BadRequest(new { error = "Boş liste." });
+
+        var result = await _productService.BulkUpdatePricesAsync(items, GetCompanyId());
+        return Ok(result);
+    }
+
     // ─── Ürün listesi (sayfalı) ───────────────────────────────────────────────
 
     [HttpGet("list")]
