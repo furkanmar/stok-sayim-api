@@ -303,56 +303,46 @@ public class ProductService
     {
         var result = new BulkPriceResultDto();
 
-        // Şirkete ait product_id seti — sahiplik kontrolü için
-        var companyProductIds = await _db.Products
-            .Where(p => p.CompanyId == companyId)
-            .Select(p => p.ProductId)
-            .ToHashSetAsync();
-
-        var chunks = items
-            .Where(i => companyProductIds.Contains(i.ProductId))
-            .Chunk(chunkSize);
-
-        var notFound = items
-            .Where(i => !companyProductIds.Contains(i.ProductId))
-            .Select(i => i.ProductId)
-            .Distinct()
-            .ToList();
-
-        result.NotFoundIds = notFound;
-        result.Skipped = notFound.Count;
-
-        foreach (var chunk in chunks)
+        foreach (var chunk in items.Chunk(chunkSize))
         {
             var productIds = chunk.Select(c => c.ProductId).Distinct().ToList();
 
-            // Mevcut en güncel fiyatları çek (product_id + unit_type bazında)
+            // Sahiplik kontrolü — sadece bu chunk'ın ID'leri için
+            var validIds = await _db.Products
+                .Where(p => p.CompanyId == companyId && productIds.Contains(p.ProductId))
+                .Select(p => p.ProductId)
+                .ToListAsync();
+
+            var validSet = validIds.ToHashSet();
+
+            var notFound = productIds.Where(id => !validSet.Contains(id)).ToList();
+            result.NotFoundIds.AddRange(notFound);
+            result.Skipped += notFound.Count;
+
+            // Mevcut en güncel fiyatlar — sadece geçerli ID'ler için
             var existingLookup = (await _db.ProductPrices
-                .Where(pp => productIds.Contains(pp.ProductId))
+                .Where(pp => validSet.Contains(pp.ProductId))
                 .ToListAsync())
                 .GroupBy(pp => (pp.ProductId, pp.UnitType))
                 .ToDictionary(g => g.Key, g => g.OrderByDescending(pp => pp.GecerlilikTarihi).First());
 
             var toAdd = new List<ProductPrice>();
 
-            foreach (var item in chunk)
+            foreach (var item in chunk.Where(i => validSet.Contains(i.ProductId)))
             {
-                if (existingLookup.TryGetValue((item.ProductId, item.UnitType), out var current))
+                if (existingLookup.TryGetValue((item.ProductId, item.UnitType), out var current)
+                    && Math.Abs(current.SatisFiyati - item.SatisFiyati) < 0.001)
                 {
-                    // Fiyat değişmediyse atla
-                    if (Math.Abs(current.SatisFiyati - item.SatisFiyati) < 0.001)
-                    {
-                        result.Skipped++;
-                        continue;
-                    }
+                    result.Skipped++;
+                    continue;
                 }
 
                 toAdd.Add(new ProductPrice
                 {
-                    ProductId    = item.ProductId,
-                    UnitType     = item.UnitType,
-                    AlisFiyati   = 0,
-                    SatisFiyati  = item.SatisFiyati,
+                    ProductId        = item.ProductId,
+                    UnitType         = item.UnitType,
+                    AlisFiyati       = 0,
+                    SatisFiyati      = item.SatisFiyati,
                     GecerlilikTarihi = DateTime.UtcNow,
                     OlusturanUserId  = null,
                 });

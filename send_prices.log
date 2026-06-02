@@ -1,0 +1,6 @@
+2026-06-02 18:54:28,186 [INFO] DB: C:\dev\code\Stok_kontrol\scripts\price_updates.db
+2026-06-02 18:54:28,187 [INFO] API: https://api.marifoglu.trade
+2026-06-02 18:54:30,203 [INFO] Token alındı.
+2026-06-02 18:54:30,213 [INFO] Gönderilecek kayıt: 7208
+2026-06-02 18:54:31,049 [WARNING] HTTP 500 attempt=1: 500 Server Error: Internal Server Error for url: https://api.marifoglu.trade/api/products/prices/bulk
+2026-06-02 18:54:33,581 [WARNING] HTTP 500 attempt=2: 500 Server Error: Internal Server Error for url: https://api.marifoglu.trade/api/products/prices/bulk
