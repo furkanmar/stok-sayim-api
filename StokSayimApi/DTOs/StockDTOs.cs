@@ -24,3 +24,20 @@ public class AddStockItemDto
     public int? ProductId { get; set; }
     public double Stock { get; set; }
 }
+
+public class StockCountItemDto
+{
+    public int Id { get; set; }
+    public int ProductId { get; set; }
+    public string ProductName { get; set; } = string.Empty;
+    public string? Kategori { get; set; }
+    public string? Barkod { get; set; }
+    public double Stock { get; set; }
+    public double? SatisFiyati { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+public class UpdateStockItemDto
+{
+    public double Stock { get; set; }
+}

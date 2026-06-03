@@ -45,9 +45,11 @@ public class ReportService
                     category = g.Key,
                     totalAlis = g.Sum(i => i.Stock * (i.Product.Prices
                         .Where(p => p.UnitType == "ADT")
+                        .OrderByDescending(p => p.GecerlilikTarihi)
                         .FirstOrDefault()?.AlisFiyati ?? 0)),
                     totalSatis = g.Sum(i => i.Stock * (i.Product.Prices
                         .Where(p => p.UnitType == "ADT")
+                        .OrderByDescending(p => p.GecerlilikTarihi)
                         .FirstOrDefault()?.SatisFiyati ?? 0)),
                     subCategories = g
                         .GroupBy(i => i.Product.AltKategori ?? "Kategorisiz")
@@ -56,17 +58,21 @@ public class ReportService
                             subCategory = sg.Key,
                             totalAlis = sg.Sum(i => i.Stock * (i.Product.Prices
                                 .Where(p => p.UnitType == "ADT")
+                                .OrderByDescending(p => p.GecerlilikTarihi)
                                 .FirstOrDefault()?.AlisFiyati ?? 0)),
                             totalSatis = sg.Sum(i => i.Stock * (i.Product.Prices
                                 .Where(p => p.UnitType == "ADT")
+                                .OrderByDescending(p => p.GecerlilikTarihi)
                                 .FirstOrDefault()?.SatisFiyati ?? 0))
                         }).ToList()
                 }).ToList(),
             grandTotalAlis = sc.Items.Sum(i => i.Stock * (i.Product.Prices
                 .Where(p => p.UnitType == "ADT")
+                .OrderByDescending(p => p.GecerlilikTarihi)
                 .FirstOrDefault()?.AlisFiyati ?? 0)),
             grandTotalSatis = sc.Items.Sum(i => i.Stock * (i.Product.Prices
                 .Where(p => p.UnitType == "ADT")
+                .OrderByDescending(p => p.GecerlilikTarihi)
                 .FirstOrDefault()?.SatisFiyati ?? 0))
         }).ToList();
 

@@ -87,10 +87,60 @@ public class StockController : ControllerBase
     }
 
     [HttpPost("complete/{stockCountId}")]
-    [Authorize(Roles = "admin,superadmin")]
+    [Authorize(Roles = "superadmin")]
     public async Task<IActionResult> CompleteStockCount(int stockCountId)
     {
         await _stockService.CompleteStockCountAsync(stockCountId);
+        return Ok();
+    }
+
+    // ─── Kalem listesi + düzeltme (superadmin) ───────────────────────────────
+
+    [HttpGet("{stockCountId}/items")]
+    [Authorize(Roles = "superadmin")]
+    public async Task<IActionResult> GetItems(int stockCountId)
+    {
+        // Sayımın bu şirkete ait olduğunu doğrula
+        var count = await _db.StockCounts
+            .Include(sc => sc.Branch)
+            .FirstOrDefaultAsync(sc => sc.Id == stockCountId && sc.Branch.CompanyId == GetCompanyId());
+        if (count == null) return NotFound();
+
+        var items = await _stockService.GetItemsAsync(stockCountId);
+        var result = items.Select(i => new StockCountItemDto
+        {
+            Id          = i.Id,
+            ProductId   = i.ProductId,
+            ProductName = i.Product.ProductName,
+            Kategori    = i.Product.Kategori,
+            Barkod      = i.Product.ProductBarcodes
+                            .FirstOrDefault(pb => pb.UnitType == "ADT")?.Barcode,
+            Stock       = i.Stock,
+            SatisFiyati = i.Product.Prices
+                            .Where(p => p.UnitType == "ADT")
+                            .OrderByDescending(p => p.GecerlilikTarihi)
+                            .FirstOrDefault()?.SatisFiyati,
+            UpdatedAt   = i.UpdatedAt
+        });
+        return Ok(result);
+    }
+
+    [HttpPut("items/{itemId}")]
+    [Authorize(Roles = "superadmin")]
+    public async Task<IActionResult> UpdateItem(int itemId, [FromBody] UpdateStockItemDto dto)
+    {
+        if (dto.Stock < 0) return BadRequest(new { message = "Stok negatif olamaz." });
+        var item = await _stockService.UpdateItemAsync(itemId, dto.Stock);
+        if (item == null) return NotFound();
+        return Ok(new { item.Id, item.Stock, item.UpdatedAt });
+    }
+
+    [HttpDelete("items/{itemId}")]
+    [Authorize(Roles = "superadmin")]
+    public async Task<IActionResult> DeleteItem(int itemId)
+    {
+        var ok = await _stockService.DeleteItemAsync(itemId);
+        if (!ok) return NotFound();
         return Ok();
     }
 }

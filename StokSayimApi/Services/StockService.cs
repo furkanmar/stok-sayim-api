@@ -74,4 +74,38 @@ public class StockService
         await _db.SaveChangesAsync();
         _logger.LogInformation("Stock count completed: {Id}", stockCountId);
     }
+
+    public async Task<List<StockCountItem>> GetItemsAsync(int stockCountId)
+    {
+        return await _db.StockCountItems
+            .Include(i => i.Product)
+                .ThenInclude(p => p.Prices)
+            .Include(i => i.Product)
+                .ThenInclude(p => p.ProductBarcodes)
+            .Where(i => i.StockCountId == stockCountId)
+            .OrderBy(i => i.Product.Kategori)
+            .ThenBy(i => i.Product.ProductName)
+            .ToListAsync();
+    }
+
+    public async Task<StockCountItem?> UpdateItemAsync(int itemId, double newStock)
+    {
+        var item = await _db.StockCountItems.FindAsync(itemId);
+        if (item == null) return null;
+        item.Stock = newStock;
+        item.UpdatedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+        _logger.LogInformation("Stock item updated: {Id} → {Stock}", itemId, newStock);
+        return item;
+    }
+
+    public async Task<bool> DeleteItemAsync(int itemId)
+    {
+        var item = await _db.StockCountItems.FindAsync(itemId);
+        if (item == null) return false;
+        _db.StockCountItems.Remove(item);
+        await _db.SaveChangesAsync();
+        _logger.LogInformation("Stock item deleted: {Id}", itemId);
+        return true;
+    }
 }
