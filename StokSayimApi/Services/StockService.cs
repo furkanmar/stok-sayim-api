@@ -81,7 +81,7 @@ public class StockService
             .Include(i => i.Product)
                 .ThenInclude(p => p.Prices)
             .Include(i => i.Product)
-                .ThenInclude(p => p.ProductBarcodes)
+                .ThenInclude(p => p.Barcodes)
             .Where(i => i.StockCountId == stockCountId)
             .OrderBy(i => i.Product.Kategori)
             .ThenBy(i => i.Product.ProductName)

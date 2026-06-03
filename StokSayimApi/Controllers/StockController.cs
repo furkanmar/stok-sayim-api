@@ -113,7 +113,7 @@ public class StockController : ControllerBase
             ProductId   = i.ProductId,
             ProductName = i.Product.ProductName,
             Kategori    = i.Product.Kategori,
-            Barkod      = i.Product.ProductBarcodes
+            Barkod      = i.Product.Barcodes
                             .FirstOrDefault(pb => pb.UnitType == "ADT")?.Barcode,
             Stock       = i.Stock,
             SatisFiyati = i.Product.Prices
