@@ -376,13 +376,14 @@ public class ProductService
             query = query.Where(p => p.Marka == marka);
         if (!string.IsNullOrWhiteSpace(kategori))
             query = query.Where(p => p.Kategori == kategori);
-        // Correlated subquery yerine non-correlated subquery — PostgreSQL hash join kullanır
+        // Materialize et — EF Core 10'da nested IQueryable.Contains çevirisi güvenilir değil
         if (hasPrice != null)
         {
-            var pricedIds = _db.ProductPrices
+            var pricedIds = await _db.ProductPrices
                 .Where(pp => pp.SatisFiyati > 0)
                 .Select(pp => pp.ProductId)
-                .Distinct();
+                .Distinct()
+                .ToListAsync();
 
             query = hasPrice == true
                 ? query.Where(p => pricedIds.Contains(p.ProductId))
