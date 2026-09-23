@@ -1,1 +1,11 @@
 ÿþ
+# build output & local data
+[Bb]in/
+[Oo]bj/
+.vs/
+logs/
+*.db
+*.db-shm
+*.db-wal
+*.user
+.env
